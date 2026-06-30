@@ -31,34 +31,48 @@ window.googleTranslateElementInit = function() {
 document.addEventListener('DOMContentLoaded', () => {
   const langToggle = document.getElementById('lang-toggle');
   const langText = document.getElementById('lang-text');
-  
-  // Check active language from cookie
-  const getCookie = (name) => {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
-  };
 
-  const currentTrans = getCookie('googtrans');
-  // Google Translate can store it as '/en/kn' or just '/en/kn' with other parameters
-  const isKannada = currentTrans && currentTrans.includes('/en/kn');
+  // Check active language from localStorage
+  const currentLang = localStorage.getItem('pref-lang') || 'en';
+  const isKannada = currentLang === 'kn';
 
   if (langText) {
     langText.textContent = isKannada ? 'English' : 'ಕನ್ನಡ';
   }
 
+  // Function to programmatically trigger Google Translate
+  function triggerGoogleTranslate(langCode) {
+    const select = document.querySelector('select.goog-te-combo');
+    if (select) {
+      select.value = langCode;
+      select.dispatchEvent(new Event('change'));
+    } else {
+      // If the select isn't ready yet, retry in 100ms
+      setTimeout(() => triggerGoogleTranslate(langCode), 150);
+    }
+  }
+
+  // If the preferred language is Kannada, trigger it on load
+  if (isKannada) {
+    triggerGoogleTranslate('kn');
+  }
+
   if (langToggle) {
     langToggle.addEventListener('click', () => {
-      if (isKannada) {
-        // Switch to English: clear the cookie
-        document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-        // Clear for current domain too
-        document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=" + window.location.hostname;
-      } else {
-        // Switch to Kannada: set the cookie
-        document.cookie = "googtrans=/en/kn; path=/";
+      const activeLang = localStorage.getItem('pref-lang') || 'en';
+      const newLang = activeLang === 'kn' ? 'en' : 'kn';
+      localStorage.setItem('pref-lang', newLang);
+      
+      if (langText) {
+        langText.textContent = newLang === 'kn' ? 'English' : 'ಕನ್ನಡ';
       }
-      window.location.reload();
+
+      if (newLang === 'kn') {
+        triggerGoogleTranslate('kn');
+      } else {
+        // Reset to English (default) by selecting empty value in Google Translate combo
+        triggerGoogleTranslate('');
+      }
     });
   }
 });
