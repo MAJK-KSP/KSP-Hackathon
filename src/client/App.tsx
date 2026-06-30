@@ -89,7 +89,7 @@ const AppContent: React.FC = () => {
     <Layout user={user} onLogout={handleLogout}>
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/dashboard" element={<Dashboard user={user} />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/security" element={<Security user={user} onMfaEnabled={checkSession} />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
