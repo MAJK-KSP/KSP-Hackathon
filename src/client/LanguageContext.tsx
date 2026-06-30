@@ -1,5 +1,7 @@
-// Local Translation Dictionary for 100% reliable, instant, offline translation
-const dictionary = {
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+
+// Local Translation Dictionary
+const dictionary: Record<string, string> = {
   // Headers & Sidebar
   "KARNATAKA STATE POLICE": "ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್",
   "SECURE COMMAND TERMINAL": "ಸುರಕ್ಷಿತ ಕಮಾಂಡ್ ಟರ್ಮಿನಲ್",
@@ -31,7 +33,7 @@ const dictionary = {
   "Crime Branch Head": "ಕ್ರೈಮ್ ಬ್ರಾಂಚ್ ಹೆಡ್",
   "Traffic In-charge": "ಟ್ರಾಫಿಕ್ ಇನ್‌ಚಾರ್ಜ್",
   "Patrol Officer": "ಪೆಟ್ರೋಲ್ ಆಫೀಸರ್",
-  "Jurisdiction": "ವ್ಯಾಪ್ತಿ",
+  "Jurisdiction": "商ಪತಿ (Jurisdiction)",
   "Select Jurisdiction...": "ವ್ಯಾಪ್ತಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ...",
   "Bengaluru City Police": "ಬೆಂಗಳೂರು ನಗರ ಪೊಲೀಸ್",
   "Mysuru City Police": "ಮೈಸೂರು ನಗರ ಪೊಲೀಸ್",
@@ -79,7 +81,7 @@ const dictionary = {
   "Official Email ID": "ಅಧಿಕೃತ ಇಮೇಲ್ ಐಡಿ",
   "Security Password": "ಭದ್ರತಾ ಪಾಸ್‌ವರ್ಡ್",
   "Verify & Continue": "ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಮುಂದುವರಿಯಿರಿ",
-  "WARNING: Unauthorized access to this system is a crime under the IT Act, 2000 and Indian Penal Code.": "ಎಚ್ಚರಿಕೆ: ಈ ಸಿಸ್ಟಮ್‌ಗೆ ಅನಧಿಕೃತ ಪ್ರವೇಶವು ಐಟಿ ಕಾಯ್ದೆ, 2000 ಮತ್ತು ಭಾರತೀಯ ದಂಡ ಸಂಹಿತೆಯ ಅಡಿಯಲ್ಲಿ ಆಪರಾಧವಾಗಿದೆ.",
+  "WARNING: Unauthorized access to this system is a crime under the IT Act, 2000 and Indian Penal Code.": "ಎಚ್ಚರಿಕೆ: ಈ ಸಿಸ್ಟಮ್‌ಗೆ ಅನಧಿಕೃತ ಪ್ರವೇಶವು ಐಟಿ ಕಾಯ್ದೆ, 2000 ಮತ್ತು ಭಾರತೀಯ ದಂಡ ಸಂಹಿತೆಯ ಅಡಿಯಲ್ಲಿ ಅಪರಾಧವಾಗಿದೆ.",
   "Two-Factor Challenge": "ದ್ವಿ-ಅಂಶದ ಸವಾಲು",
   "Enter the 6-digit verification code from your authenticator app.": "ನಿಮ್ಮ ಅಥೆಂಟಿಕೇಟರ್ ಅಪ್ಲಿಕೇಶನ್‌ನಿಂದ 6-ಅಂಕಿಯ ಪರಿಶೀಲನಾ ಕೋಡ್ ಅನ್ನು ನಮೂದಿಸಿ.",
   "Verification Code": "ಪರಿಶೀಲನಾ ಕೋಡ್",
@@ -102,178 +104,108 @@ const dictionary = {
   "Designed & Developed by KSP IT Cell / National Informatics Centre (NIC).": "ವಿನ್ಯಾಸ ಮತ್ತು ಅಭಿವೃದ್ಧಿಪಡಿಸಿದವರು KSP ಐಟಿ ಸೆಲ್ / ರಾಷ್ಟ್ರೀಯ ಮಾಹಿತಿ ಕೇಂದ್ರ (NIC)."
 };
 
-// Google Translate Element Initialization (Fallback for dynamic custom text)
-window.googleTranslateElementInit = function() {
-  new google.translate.TranslateElement({
-    pageLanguage: 'en',
-    includedLanguages: 'kn',
-    layout: google.translate.TranslateElement.InlineLayout.SIMPLE
-  }, 'google_translate_element');
-};
+interface LanguageContextType {
+  locale: 'en' | 'kn';
+  t: (key: string) => string;
+  toggleLanguage: () => void;
+}
 
-// Load Google Translate Script dynamically
-(function() {
-  const el = document.createElement('div');
-  el.id = 'google_translate_element';
-  el.style.position = 'absolute';
-  el.style.top = '-9999px';
-  el.style.left = '-9999px';
-  el.style.width = '1px';
-  el.style.height = '1px';
-  el.style.overflow = 'hidden';
-  document.body.appendChild(el);
+const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-  const script = document.createElement('script');
-  script.type = 'text/javascript';
-  script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
-  document.head.appendChild(script);
-})();
+// Extend Window interface for Google Translate
+declare global {
+  interface Window {
+    googleTranslateElementInit?: () => void;
+  }
+}
 
-// DOM Traversal Translation Engine
-function translateDOM(toKannada) {
-  // 1. Helper to recursively translate text nodes
-  function walk(node) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const text = node.nodeValue.trim();
-      if (text) {
-        if (toKannada) {
-          for (const [eng, kan] of Object.entries(dictionary)) {
-            if (text === eng) {
-              if (node._originalText === undefined) node._originalText = node.nodeValue;
-              node.nodeValue = node.nodeValue.replace(eng, kan);
-              break;
-            }
-          }
-        } else {
-          if (node._originalText !== undefined) {
-            node.nodeValue = node._originalText;
-          }
-        }
+export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [locale, setLocale] = useState<'en' | 'kn'>(() => {
+    return (localStorage.getItem('pref-lang') as 'en' | 'kn') || 'en';
+  });
+
+  useEffect(() => {
+    // Save preference
+    localStorage.setItem('pref-lang', locale);
+
+    // Update document title dynamically
+    if (locale === 'kn') {
+      if (!document.title.includes('ಕರ್ನಾಟಕ')) {
+        document.title = "KSP - ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್ ಸುರಕ್ಷಿತ ಪೋರ್ಟಲ್";
       }
     } else {
-      // Do not translate scripts, styles, or Google Translate elements
-      if (node.tagName !== 'SCRIPT' && node.tagName !== 'STYLE' && node.id !== 'google_translate_element') {
-        for (let child of node.childNodes) {
-          walk(child);
-        }
-      }
+      document.title = "KSP - Karnataka State Police Secure Portal";
     }
-  }
 
-  // 2. Translate document title
-  if (toKannada) {
-    if (document.title.includes('KSP - ')) {
-      if (!document._originalTitle) document._originalTitle = document.title;
-      document.title = document.title
-        .replace("Secure Command Terminal", "ಸುರಕ್ಷಿತ ಕಮಾಂಡ್ ಟರ್ಮಿನಲ್")
-        .replace("Officer Profile", "ಅಧಿಕಾರಿ ಪ್ರೊಫೈಲ್")
-        .replace("MFA Security", "ಎಂಎಫ್ಎ ಭದ್ರತೆ")
-        .replace("Karnataka State Police Secure Portal", "ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್ ಸುರಕ್ಷಿತ ಪೋರ್ಟಲ್");
-    }
-  } else {
-    if (document._originalTitle) {
-      document.title = document._originalTitle;
-    }
-  }
-
-  // Walk the body
-  walk(document.body);
-
-  // 3. Translate input placeholders and option elements
-  const inputs = document.querySelectorAll('input, select, option');
-  inputs.forEach(el => {
-    // Translate placeholders
-    if (el.placeholder) {
-      if (toKannada) {
-        for (const [eng, kan] of Object.entries(dictionary)) {
-          if (el.placeholder === eng) {
-            if (el._originalPlaceholder === undefined) el._originalPlaceholder = el.placeholder;
-            el.placeholder = kan;
-            break;
-          }
-        }
+    // Google Translate fallback trigger
+    const triggerGoogleTranslate = (langCode: string) => {
+      const select = document.querySelector('select.goog-te-combo') as HTMLSelectElement;
+      if (select) {
+        select.value = langCode;
+        select.dispatchEvent(new Event('change'));
       } else {
-        if (el._originalPlaceholder !== undefined) {
-          el.placeholder = el._originalPlaceholder;
-        }
+        setTimeout(() => triggerGoogleTranslate(langCode), 150);
       }
+    };
+
+    triggerGoogleTranslate(locale === 'kn' ? 'kn' : '');
+  }, [locale]);
+
+  // Load Google Translate Script in background on mount
+  useEffect(() => {
+    window.googleTranslateElementInit = () => {
+      // @ts-ignore
+      new window.google.translate.TranslateElement({
+        pageLanguage: 'en',
+        includedLanguages: 'kn',
+        // @ts-ignore
+        layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE
+      }, 'google_translate_element');
+    };
+
+    const el = document.createElement('div');
+    el.id = 'google_translate_element';
+    el.style.position = 'absolute';
+    el.style.top = '-9999px';
+    el.style.left = '-9999px';
+    el.style.width = '1px';
+    el.style.height = '1px';
+    el.style.overflow = 'hidden';
+    document.body.appendChild(el);
+
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+    document.head.appendChild(script);
+
+    return () => {
+      document.body.removeChild(el);
+      document.head.removeChild(script);
+    };
+  }, []);
+
+  const t = (key: string): string => {
+    if (locale === 'kn' && dictionary[key]) {
+      return dictionary[key];
     }
+    return key;
+  };
 
-    // Translate option text
-    if (el.tagName === 'OPTION') {
-      const text = el.textContent.trim();
-      if (toKannada) {
-        for (const [eng, kan] of Object.entries(dictionary)) {
-          if (text === eng) {
-            if (el._originalText === undefined) el._originalText = el.textContent;
-            el.textContent = kan;
-            break;
-          }
-        }
-      } else {
-        if (el._originalText !== undefined) {
-          el.textContent = el._originalText;
-        }
-      }
-    }
-  });
-}
+  const toggleLanguage = () => {
+    setLocale((prev) => (prev === 'kn' ? 'en' : 'kn'));
+  };
 
-// Programmatic Google Translate Fallback Trigger
-function triggerGoogleTranslate(langCode) {
-  const select = document.querySelector('select.goog-te-combo');
-  if (select) {
-    select.value = langCode;
-    select.dispatchEvent(new Event('change'));
-  } else {
-    setTimeout(() => triggerGoogleTranslate(langCode), 150);
+  return (
+    <LanguageContext.Provider value={{ locale, t, toggleLanguage }}>
+      {children}
+    </LanguageContext.Provider>
+  );
+};
+
+export const useLanguage = () => {
+  const context = useContext(LanguageContext);
+  if (!context) {
+    throw new Error('useLanguage must be used within a LanguageProvider');
   }
-}
-
-// Initial Translation execution
-document.addEventListener('DOMContentLoaded', () => {
-  const langToggle = document.getElementById('lang-toggle');
-  const langText = document.getElementById('lang-text');
-
-  const currentLang = localStorage.getItem('pref-lang') || 'en';
-  const isKannada = currentLang === 'kn';
-
-  if (langText) {
-    langText.textContent = isKannada ? 'English' : 'ಕನ್ನಡ';
-  }
-
-  // Execute native translation + Google Translate fallback on load
-  if (isKannada) {
-    translateDOM(true);
-    triggerGoogleTranslate('kn');
-  }
-
-  // Monitor DOM changes to translate dynamically loaded content (e.g. session details)
-  const observer = new MutationObserver(() => {
-    const isCurrentlyKannada = localStorage.getItem('pref-lang') === 'kn';
-    if (isCurrentlyKannada) {
-      translateDOM(true);
-    }
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-
-  if (langToggle) {
-    langToggle.addEventListener('click', () => {
-      const activeLang = localStorage.getItem('pref-lang') || 'en';
-      const newLang = activeLang === 'kn' ? 'en' : 'kn';
-      localStorage.setItem('pref-lang', newLang);
-      
-      if (langText) {
-        langText.textContent = newLang === 'kn' ? 'English' : 'ಕನ್ನಡ';
-      }
-
-      if (newLang === 'kn') {
-        translateDOM(true);
-        triggerGoogleTranslate('kn');
-      } else {
-        translateDOM(false);
-        triggerGoogleTranslate('');
-      }
-    });
-  }
-});
+  return context;
+};

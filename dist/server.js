@@ -21,91 +21,34 @@ app.use((0, cookie_parser_1.default)());
 app.use(middleware_1.securityHeaders);
 // Apply general rate limiting to API endpoints only
 app.use('/api', middleware_1.generalLimiter);
-// Serve frontend static files (with fallback for compiled production build)
-const publicPath = fs_1.default.existsSync(path_1.default.join(__dirname, 'public'))
-    ? path_1.default.join(__dirname, 'public')
-    : path_1.default.join(__dirname, '../src/public');
-// Page Routes (with Secure Redirects)
-app.get('/', async (req, res) => {
+// Serve frontend static files (prioritizing compiled React build)
+const publicPath = fs_1.default.existsSync(path_1.default.resolve(__dirname, '../dist/public'))
+    ? path_1.default.resolve(__dirname, '../dist/public')
+    : fs_1.default.existsSync(path_1.default.resolve(__dirname, 'public'))
+        ? path_1.default.resolve(__dirname, 'public')
+        : path_1.default.resolve(__dirname, '../src/public');
+// Page Routes (with Secure Redirects for React SPA)
+app.get(['/', '/dashboard', '/profile', '/security'], async (req, res) => {
     const sessionId = req.cookies.session_id;
+    const isRoot = req.path === '/';
     if (sessionId) {
         try {
             const user = await (0, auth_1.validateSession)(sessionId);
             if (user) {
-                return res.redirect('/dashboard');
+                if (isRoot) {
+                    return res.redirect('/dashboard');
+                }
+                return res.sendFile(path_1.default.join(publicPath, 'index.html'));
             }
         }
         catch (err) {
-            console.error('Error during root redirect check:', err);
+            console.error('Error during session validation redirect:', err);
         }
+    }
+    if (!isRoot) {
+        return res.redirect('/');
     }
     res.sendFile(path_1.default.join(publicPath, 'index.html'));
-});
-app.get('/dashboard', async (req, res) => {
-    const sessionId = req.cookies.session_id;
-    if (!sessionId) {
-        return res.redirect('/');
-    }
-    try {
-        const user = await (0, auth_1.validateSession)(sessionId);
-        if (!user) {
-            res.clearCookie('session_id', {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
-            });
-            return res.redirect('/');
-        }
-        res.sendFile(path_1.default.join(publicPath, 'dashboard.html'));
-    }
-    catch (err) {
-        console.error('Error during dashboard redirect check:', err);
-        return res.redirect('/');
-    }
-});
-app.get('/profile', async (req, res) => {
-    const sessionId = req.cookies.session_id;
-    if (!sessionId) {
-        return res.redirect('/');
-    }
-    try {
-        const user = await (0, auth_1.validateSession)(sessionId);
-        if (!user) {
-            res.clearCookie('session_id', {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
-            });
-            return res.redirect('/');
-        }
-        res.sendFile(path_1.default.join(publicPath, 'profile.html'));
-    }
-    catch (err) {
-        console.error('Error during profile redirect check:', err);
-        return res.redirect('/');
-    }
-});
-app.get('/security', async (req, res) => {
-    const sessionId = req.cookies.session_id;
-    if (!sessionId) {
-        return res.redirect('/');
-    }
-    try {
-        const user = await (0, auth_1.validateSession)(sessionId);
-        if (!user) {
-            res.clearCookie('session_id', {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
-            });
-            return res.redirect('/');
-        }
-        res.sendFile(path_1.default.join(publicPath, 'security.html'));
-    }
-    catch (err) {
-        console.error('Error during security redirect check:', err);
-        return res.redirect('/');
-    }
 });
 // Serve other static assets (CSS, JS, SVG)
 app.use(express_1.default.static(publicPath));
