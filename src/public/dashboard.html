@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Official secure command terminal for the Karnataka State Police. Unauthorized access is strictly prohibited.">
+  <title>KSP - Secure Command Terminal</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+Kannada:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Error/Success Notification Toast -->
+  <div id="toast" class="toast hidden">
+    <span id="toast-message"></span>
+  </div>
+
+  <!-- Dashboard View -->
+  <div id="dashboard-view">
+    <!-- Top Decorative Banner -->
+    <div class="top-banners">
+      <div class="karnataka-strip"></div>
+      <div class="national-strip"></div>
+    </div>
+
+    <!-- Dashboard Header -->
+    <header class="dash-header">
+      <div class="dash-header-container">
+        <div class="dash-brand">
+          <svg class="ksp-logo-dash" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="40" height="40">
+            <circle cx="100" cy="100" r="95" fill="#0b1e36" stroke="#c5a059" stroke-width="4" />
+            <path d="M 75,68 C 75,68 88,64 100,58 C 112,64 125,68 125,68 L 125,98 C 125,118 100,132 100,132 C 100,132 75,118 75,98 Z" fill="#a82329" stroke="#c5a059" stroke-width="2" />
+          </svg>
+          <div>
+            <span class="dash-title-main">KARNATAKA STATE POLICE</span>
+            <span class="dash-title-sub">SECURE COMMAND TERMINAL</span>
+          </div>
+        </div>
+        <div class="dash-user-controls">
+          <div class="user-badge">
+            <div class="user-avatar">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            </div>
+            <div class="user-details">
+              <span id="dash-officer-email" class="officer-email">Loading...</span>
+              <span class="officer-rank">Authenticated Officer</span>
+            </div>
+          </div>
+          <button id="logout-btn" class="btn-logout">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            <span>Sign Out</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Dashboard Main Layout -->
+    <div class="dash-layout">
+      <div class="dash-container">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="dash-sidebar">
+          <nav class="sidebar-nav">
+            <button class="nav-item active" data-tab="overview">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+              <span>Overview</span>
+            </button>
+            <button class="nav-item" data-tab="security">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              <span>MFA Security</span>
+            </button>
+          </nav>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="dash-content">
+          
+          <!-- 1. OVERVIEW TAB -->
+          <div id="tab-overview" class="tab-pane active">
+            <div class="welcome-banner">
+              <h2>Welcome to the KSP Central Command</h2>
+              <p>System Status: <span class="status-indicator-green">● Secured & Active</span></p>
+            </div>
+
+            <!-- KPI Statistics Grid -->
+            <div class="kpi-grid">
+              <div class="kpi-card">
+                <div class="kpi-icon blue">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                </div>
+                <div class="kpi-data">
+                  <span class="kpi-num">112</span>
+                  <span class="kpi-label">Emergency Active Hotline</span>
+                </div>
+              </div>
+
+              <div class="kpi-card">
+                <div class="kpi-icon gold">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                </div>
+                <div class="kpi-data">
+                  <span class="kpi-num">2,491</span>
+                  <span class="kpi-label">On-duty Officers</span>
+                </div>
+              </div>
+
+              <div class="kpi-card">
+                <div class="kpi-icon green">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                </div>
+                <div class="kpi-data">
+                  <span class="kpi-num">99.9%</span>
+                  <span class="kpi-label">Terminal Uptime</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Double Card Section -->
+            <div class="dash-details-grid">
+              <!-- Officer Info Card -->
+              <div class="details-card">
+                <h3>Officer Profile</h3>
+                <div class="dash-user-info">
+                  <div class="profile-row">
+                    <span class="profile-label">Authorized Email</span>
+                    <span id="profile-email" class="profile-val">-</span>
+                  </div>
+                  <div class="profile-row">
+                    <span class="profile-label">Unique Officer ID</span>
+                    <span id="profile-id" class="profile-val">-</span>
+                  </div>
+                  <div class="profile-row">
+                    <span class="profile-label">Session Created</span>
+                    <span id="profile-created" class="profile-val">-</span>
+                  </div>
+                  <div class="profile-row">
+                    <span class="profile-label">MFA Shield Status</span>
+                    <span id="profile-mfa" class="profile-val">-</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Terminal Logs Card -->
+              <div class="details-card">
+                <h3>Terminal Audit Log</h3>
+                <div class="audit-logs">
+                  <div class="log-item">
+                    <span class="log-time">Just Now</span>
+                    <span class="log-desc">Successful terminal authentication (Session Established)</span>
+                  </div>
+                  <div class="log-item">
+                    <span class="log-time">5 mins ago</span>
+                    <span class="log-desc">MFA challenge completed successfully</span>
+                  </div>
+                  <div class="log-item opacity-5">
+                    <span class="log-time">1 hour ago</span>
+                    <span class="log-desc">Database self-health check: Optimal</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. SECURITY TAB -->
+          <div id="tab-security" class="tab-pane">
+            <div class="details-card">
+              <h2>Multi-Factor Authentication (MFA / 2FA)</h2>
+              <p class="tab-desc">MFA adds an extra layer of security to your account. In addition to your password, you will need a verification code from your authenticator app.</p>
+              
+              <!-- MFA Setup (Inactive) -->
+              <div id="mfa-setup-section" class="mfa-section-box">
+                <div class="mfa-status-banner warning">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                  <div>
+                    <h4>MFA is currently disabled</h4>
+                    <p>It is highly recommended to enable MFA immediately to secure your KSP account.</p>
+                  </div>
+                </div>
+                <button type="button" id="setup-mfa-btn" class="btn-primary fit-content">Configure 2FA Token</button>
+              </div>
+
+              <!-- MFA Setup (Active Setup) -->
+              <div id="mfa-setup-active-section" class="mfa-section-box hidden">
+                <div class="mfa-steps">
+                  <div class="mfa-step">
+                    <span class="step-num">1</span>
+                    <p>Scan this QR code with Google Authenticator, Authy, or Microsoft Authenticator.</p>
+                  </div>
+                  <div class="qr-container">
+                    <img id="mfa-qr-image" src="" alt="MFA QR Code">
+                  </div>
+                  <div class="mfa-step">
+                    <span class="step-num">2</span>
+                    <p>Enter the 6-digit verification code generated by your app below.</p>
+                  </div>
+                  <div class="input-group fit-content center-input">
+                    <input type="text" id="mfa-setup-code" placeholder="000000" maxlength="6">
+                  </div>
+                  <div class="mfa-setup-actions">
+                    <button type="button" id="verify-mfa-setup-btn" class="btn-primary">Verify & Enable</button>
+                    <button type="button" id="cancel-mfa-setup-btn" class="btn-secondary">Cancel Setup</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- MFA Enabled State -->
+              <div id="mfa-active-banner" class="mfa-status-banner success hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                <div>
+                  <h4>MFA is Active & Protecting Your Account</h4>
+                  <p>Your session is protected by standard hardware-based TOTP encryption.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </main>
+
+      </div>
+    </div>
+
+    <!-- Dashboard Footer -->
+    <footer class="dash-footer">
+      <p>Karnataka State Police Secure Command Terminal • Copyright © 2026 KSP. All Rights Reserved.</p>
+    </footer>
+  </div>
+
+  <!-- Dashboard Client Logic -->
+  <script src="dashboard.js"></script>
+</body>
+</html>
