@@ -38,91 +38,37 @@ app.use(securityHeaders);
 // Apply general rate limiting to API endpoints only
 app.use('/api', generalLimiter);
 
-// Serve frontend static files (with fallback for compiled production build)
-const publicPath = fs.existsSync(path.join(__dirname, 'public'))
-  ? path.join(__dirname, 'public')
-  : path.join(__dirname, '../src/public');
+// Serve frontend static files (prioritizing compiled React build)
+const publicPath = fs.existsSync(path.resolve(__dirname, '../dist/public'))
+  ? path.resolve(__dirname, '../dist/public')
+  : fs.existsSync(path.resolve(__dirname, 'public'))
+    ? path.resolve(__dirname, 'public')
+    : path.resolve(__dirname, '../src/public');
 
-// Page Routes (with Secure Redirects)
-app.get('/', async (req, res) => {
+// Page Routes (with Secure Redirects for React SPA)
+app.get(['/', '/dashboard', '/profile', '/security'], async (req, res) => {
   const sessionId = req.cookies.session_id;
+  const isRoot = req.path === '/';
+  
   if (sessionId) {
     try {
       const user = await validateSession(sessionId);
       if (user) {
-        return res.redirect('/dashboard');
+        if (isRoot) {
+          return res.redirect('/dashboard');
+        }
+        return res.sendFile(path.join(publicPath, 'index.html'));
       }
     } catch (err) {
-      console.error('Error during root redirect check:', err);
+      console.error('Error during session validation redirect:', err);
     }
   }
+  
+  if (!isRoot) {
+    return res.redirect('/');
+  }
+  
   res.sendFile(path.join(publicPath, 'index.html'));
-});
-
-app.get('/dashboard', async (req, res) => {
-  const sessionId = req.cookies.session_id;
-  if (!sessionId) {
-    return res.redirect('/');
-  }
-  try {
-    const user = await validateSession(sessionId);
-    if (!user) {
-      res.clearCookie('session_id', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-      });
-      return res.redirect('/');
-    }
-    res.sendFile(path.join(publicPath, 'dashboard.html'));
-  } catch (err) {
-    console.error('Error during dashboard redirect check:', err);
-    return res.redirect('/');
-  }
-});
-
-app.get('/profile', async (req, res) => {
-  const sessionId = req.cookies.session_id;
-  if (!sessionId) {
-    return res.redirect('/');
-  }
-  try {
-    const user = await validateSession(sessionId);
-    if (!user) {
-      res.clearCookie('session_id', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-      });
-      return res.redirect('/');
-    }
-    res.sendFile(path.join(publicPath, 'profile.html'));
-  } catch (err) {
-    console.error('Error during profile redirect check:', err);
-    return res.redirect('/');
-  }
-});
-
-app.get('/security', async (req, res) => {
-  const sessionId = req.cookies.session_id;
-  if (!sessionId) {
-    return res.redirect('/');
-  }
-  try {
-    const user = await validateSession(sessionId);
-    if (!user) {
-      res.clearCookie('session_id', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-      });
-      return res.redirect('/');
-    }
-    res.sendFile(path.join(publicPath, 'security.html'));
-  } catch (err) {
-    console.error('Error during security redirect check:', err);
-    return res.redirect('/');
-  }
 });
 
 // Serve other static assets (CSS, JS, SVG)
