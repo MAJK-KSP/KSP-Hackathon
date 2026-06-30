@@ -19,12 +19,12 @@ export const securityHeaders = (
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; " +
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://translate.googleapis.com; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com translate.googleapis.com; " +
     "font-src 'self' https://fonts.gstatic.com; " +
-    "img-src 'self' data: https://translate.google.com https://translate.googleapis.com https://www.google.com https://www.google.co.in; " +
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://translate.google.com https://translate.googleapis.com; " +
-    "connect-src 'self' https://translate.googleapis.com; " +
-    "frame-src 'self' https://translate.google.com; " +
+    "img-src 'self' data: translate.google.com translate.googleapis.com www.google.com www.google.co.in; " +
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' translate.google.com translate.googleapis.com; " +
+    "connect-src 'self' translate.googleapis.com; " +
+    "frame-src 'self' translate.google.com; " +
     "frame-ancestors 'none';"
   );
   next();
