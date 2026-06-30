@@ -20,12 +20,12 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
   const navigate = useNavigate();
 
   return (
-    <div id="dashboard-view" className="dashboard-layout">
+    <div id="dashboard-view" className="dash-layout">
       {/* Dashboard Header */}
       <header className="dash-header">
         <div className="dash-header-container">
           <div className="dash-brand" onClick={() => navigate('/dashboard')} style={{ cursor: 'pointer' }}>
-            <svg class="ksp-logo-header" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="42" height="42">
+            <svg className="ksp-logo-header" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="42" height="42">
               <circle cx="100" cy="100" r="95" fill="#0b1e36" stroke="#c5a059" stroke-width="4" />
               <circle cx="100" cy="100" r="76" fill="none" stroke="#c5a059" stroke-width="1.5" stroke-dasharray="4 2" />
               <circle cx="100" cy="100" r="58" fill="#ffffff" stroke="#c5a059" stroke-width="3" />
@@ -36,9 +36,9 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
                 <path d="M 6,-12 C 18,-15 28,-6 25,12 C 22,18 15,14 10,6 C 7,0 6,-6 6,-12 Z" />
               </g>
             </svg>
-            <div class="brand-meta">
-              <h1 class="dash-title">{t("KARNATAKA STATE POLICE")}</h1>
-              <span class="dash-subtitle">{t("SECURE COMMAND TERMINAL")}</span>
+            <div className="brand-meta">
+              <span className="dash-title-main">{t("KARNATAKA STATE POLICE")}</span>
+              <span className="dash-title-sub">{t("SECURE COMMAND TERMINAL")}</span>
             </div>
           </div>
 
@@ -64,7 +64,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
                       <circle cx="12" cy="7" r="4"></circle>
                     </svg>
                   </div>
-                  <div className="user-info">
+                  <div className="user-details">
                     <span className="officer-email" id="dash-officer-email">{user.email}</span>
                     <span className="officer-rank">{t("Authenticated Officer")}</span>
                   </div>
