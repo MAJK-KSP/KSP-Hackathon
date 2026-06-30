@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Official secure command terminal for the Karnataka State Police. Unauthorized access is strictly prohibited.">
+  <title>KSP - Secure Command Terminal</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+Kannada:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Error/Success Notification Toast -->
+  <div id="toast" class="toast hidden">
+    <span id="toast-message"></span>
+  </div>
+
+  <!-- Dashboard View -->
+  <div id="dashboard-view">
+    <!-- Top Decorative Banner -->
+    <div class="top-banners">
+      <div class="karnataka-strip"></div>
+      <div class="national-strip"></div>
+    </div>
+
+    <!-- Dashboard Header -->
+    <header class="dash-header">
+      <div class="dash-header-container">
+        <div class="dash-brand">
+          <svg class="ksp-logo-dash" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="40" height="40">
+            <circle cx="100" cy="100" r="95" fill="#0b1e36" stroke="#c5a059" stroke-width="4" />
+            <path d="M 75,68 C 75,68 88,64 100,58 C 112,64 125,68 125,68 L 125,98 C 125,118 100,132 100,132 C 100,132 75,118 75,98 Z" fill="#a82329" stroke="#c5a059" stroke-width="2" />
+          </svg>
+          <div>
+            <span class="dash-title-main">KARNATAKA STATE POLICE</span>
+            <span class="dash-title-sub">SECURE COMMAND TERMINAL</span>
+          </div>
+        </div>
+        <div class="dash-user-controls">
+          <div class="lang-switcher" style="margin-right: 8px;">
+            <button id="lang-toggle" class="btn-lang">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+              <span id="lang-text">ಕನ್ನಡ</span>
+            </button>
+          </div>
+          <div class="user-badge">
+            <div class="user-avatar">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            </div>
+            <div class="user-details">
+              <span id="dash-officer-email" class="officer-email">Loading...</span>
+              <span class="officer-rank">Authenticated Officer</span>
+            </div>
+          </div>
+          <button id="logout-btn" class="btn-logout">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            <span>Sign Out</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Dashboard Main Layout -->
+    <div class="dash-layout">
+      <div class="dash-container">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="dash-sidebar">
+          <nav class="sidebar-nav">
+            <a href="/dashboard" class="nav-item active">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+              <span>Overview</span>
+            </a>
+            <a href="/profile" class="nav-item">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              <span>Officer Profile</span>
+            </a>
+            <a href="/security" class="nav-item">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              <span>MFA Security</span>
+            </a>
+          </nav>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="dash-content">
+          <!-- Build your HTML from scratch here -->
+        </main>
+
+      </div>
+    </div>
+
+    <!-- Dashboard Footer -->
+    <footer class="dash-footer">
+      <p>Karnataka State Police Secure Command Terminal • Copyright © 2026 KSP. All Rights Reserved.</p>
+    </footer>
+  </div>
+
+  <!-- Dashboard Client Logic -->
+  <script src="dashboard.js"></script>
+  <script src="translate.js"></script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <!-- Definitions for Gradients and Filters -->
+  <defs>
+    <!-- Gold Gradients -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFE082" />
+      <stop offset="50%" stop-color="#C5A059" />
+      <stop offset="100%" stop-color="#8D6E2F" />
+    </linearGradient>
+    <linearGradient id="goldLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF8E1" />
+      <stop offset="100%" stop-color="#FFE082" />
+    </linearGradient>
+    
+    <!-- Red Gradients -->
+    <linearGradient id="redGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#D32F2F" />
+      <stop offset="100%" stop-color="#8C1D21" />
+    </linearGradient>
+    
+    <!-- Blue Gradients -->
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E3A8A" />
+      <stop offset="100%" stop-color="#0F172A" />
+    </linearGradient>
+    
+    <!-- Shadow Filter -->
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.15" />
+    </filter>
+  </defs>
+
+  <!-- Outer Blue Ring with Gold Borders -->
+  <circle cx="100" cy="100" r="95" fill="url(#blueGrad)" stroke="url(#goldGrad)" stroke-width="4" filter="url(#dropShadow)" />
+  <circle cx="100" cy="100" r="76" fill="none" stroke="url(#goldGrad)" stroke-width="1.5" stroke-dasharray="4 2" />
+
+  <!-- Circular Text Paths -->
+  <path id="textPathTop" d="M 25,100 A 75,75 0 1,1 175,100" fill="none" />
+  <path id="textPathBottom" d="M 175,100 A 75,75 0 0,1 25,100" fill="none" />
+
+  <!-- English Text on Top -->
+  <text font-family="'Outfit', sans-serif" font-weight="800" font-size="11" fill="url(#goldLight)" letter-spacing="2.5">
+    <textPath href="#textPathTop" startOffset="50%" text-anchor="middle">
+      KARNATAKA STATE POLICE
+    </textPath>
+  </text>
+
+  <!-- Kannada Text on Bottom -->
+  <text font-family="'Noto Sans Kannada', sans-serif" font-weight="700" font-size="11.5" fill="url(#goldLight)" letter-spacing="1">
+    <textPath href="#textPathBottom" startOffset="50%" text-anchor="middle">
+      ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್
+    </textPath>
+  </text>
+
+  <!-- Inner Gold Ring -->
+  <circle cx="100" cy="100" r="58" fill="#ffffff" stroke="url(#goldGrad)" stroke-width="3" />
+
+  <!-- Central Shield -->
+  <path d="M 75,68 
+           C 75,68 88,64 100,58 
+           C 112,64 125,68 125,68 
+           L 125,98 
+           C 125,118 100,132 100,132 
+           C 100,132 75,118 75,98 
+           Z" 
+        fill="url(#redGrad)" 
+        stroke="url(#goldGrad)" 
+        stroke-width="2" 
+        filter="url(#dropShadow)" />
+
+  <!-- Ashoka Lion Capital (Simplified representation on top of shield) -->
+  <g transform="translate(100, 48) scale(0.48)" stroke="url(#goldGrad)" stroke-width="1.5" fill="url(#goldLight)">
+    <!-- Base / Abacus -->
+    <path d="M -20,10 L 20,10 L 15,18 L -15,18 Z" />
+    <circle cx="0" cy="14" r="2.5" />
+    <!-- Center Lion -->
+    <path d="M -7,10 C -7,0 -12,-5 -10,-15 C -8,-20 -2,-25 0,-25 C 2,-25 8,-20 10,-15 C 12,-5 7,0 7,10 Z" />
+    <!-- Left Lion Profile -->
+    <path d="M -6,4 C -12,4 -18,0 -17,-10 C -16,-15 -10,-18 -6,-16 Z" />
+    <!-- Right Lion Profile -->
+    <path d="M 6,4 C 12,4 18,0 17,-10 C 16,-15 10,-18 6,-16 Z" />
+  </g>
+
+  <!-- Gandabherunda (Two-headed mythical bird) inside the shield -->
+  <g transform="translate(100, 96) scale(0.72)" fill="url(#goldLight)" stroke="#5c4308" stroke-width="0.5">
+    <!-- Left Head -->
+    <path d="M -4,-22 C -6,-24 -9,-24 -11,-22 C -13,-20 -13,-17 -11,-15 C -9,-13 -6,-13 -4,-15" />
+    <path d="M -11,-19 L -16,-18 L -12,-16 Z" fill="url(#goldGrad)" /> <!-- Beak -->
+    
+    <!-- Right Head -->
+    <path d="M 4,-22 C 6,-24 9,-24 11,-22 C 13,-20 13,-17 11,-15 C 9,-13 6,-13 4,-15" />
+    <path d="M 11,-19 L 16,-18 L 12,-16 Z" fill="url(#goldGrad)" /> <!-- Beak -->
+
+    <!-- Common Neck / Body -->
+    <path d="M -8,-15 L 8,-15 C 10,-8 12,5 0,16 C -12,5 -10,-8 -8,-15 Z" />
+
+    <!-- Left Wing -->
+    <path d="M -6,-12 C -18,-15 -28,-6 -25,12 C -22,18 -15,14 -10,6 C -7,0 -6,-6 -6,-12 Z" />
+    <path d="M -12,-5 L -23,-1 C -20,5 -15,5 -12,-1 Z" opacity="0.8" />
+    <path d="M -10,2 L -20,8 C -18,12 -14,10 -10,5 Z" opacity="0.6" />
+
+    <!-- Right Wing -->
+    <path d="M 6,-12 C 18,-15 28,-6 25,12 C 22,18 15,14 10,6 C 7,0 6,-6 6,-12 Z" />
+    <path d="M 8,-5 L 23,-1 C 20,5 15,5 12,-1 Z" opacity="0.8" />
+    <path d="M 10,2 L 20,8 C 18,12 14,10 10,5 Z" opacity="0.6" />
+
+    <!-- Tail Feathers -->
+    <path d="M -4,15 L -8,28 C -2,30 2,30 8,28 L 4,15 Z" />
+    <path d="M 0,16 L 0,29" stroke="url(#goldGrad)" stroke-width="1.5" />
+  </g>
+</svg>
