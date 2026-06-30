@@ -67,10 +67,18 @@ const initDb = async () => {
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       mfa_secret TEXT,
+      temp_mfa_secret TEXT,
       mfa_enabled INTEGER DEFAULT 0,
       created_at TEXT NOT NULL
     );
   `);
+    // Run a safe migration to add temp_mfa_secret if the table already exists
+    try {
+        await (0, exports.runQuery)('ALTER TABLE users ADD COLUMN temp_mfa_secret TEXT;');
+    }
+    catch (err) {
+        // Column already exists or table doesn't exist yet (handled by CREATE TABLE)
+    }
     // Index on email for faster lookups
     await (0, exports.runQuery)(`
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -84,6 +92,19 @@ const initDb = async () => {
       created_at TEXT NOT NULL,
       user_agent TEXT,
       ip_address TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+    // Create officer_profiles table
+    await (0, exports.runQuery)(`
+    CREATE TABLE IF NOT EXISTS officer_profiles (
+      user_id TEXT PRIMARY KEY,
+      badge_number TEXT,
+      rank TEXT,
+      post TEXT,
+      jurisdiction TEXT,
+      area TEXT,
+      station TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
   `);

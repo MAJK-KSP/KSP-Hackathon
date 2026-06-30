@@ -69,11 +69,13 @@ const createSession = async (userId, userAgent, ipAddress) => {
 exports.createSession = createSession;
 const validateSession = async (sessionId) => {
     const now = new Date().toISOString();
-    // Find session and join with user, ensuring the session has not expired
+    // Find session and join with user, ensuring the session has not expired and is not a pending MFA session
     const sessionUser = await (0, db_1.getRow)(`SELECT u.id, u.email, u.mfa_enabled, u.created_at, s.expires_at
      FROM sessions s
      JOIN users u ON s.user_id = u.id
-     WHERE s.id = ? AND s.expires_at > ?`, [sessionId, now]);
+     WHERE s.id = ? 
+       AND s.expires_at > ? 
+       AND (s.user_agent IS NULL OR s.user_agent != 'mfa_pending')`, [sessionId, now]);
     if (!sessionUser) {
         return null;
     }

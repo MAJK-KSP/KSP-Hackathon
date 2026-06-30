@@ -3,9 +3,25 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authenticateSession = exports.generalLimiter = exports.authLimiter = void 0;
+exports.authenticateSession = exports.generalLimiter = exports.authLimiter = exports.securityHeaders = void 0;
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const auth_1 = require("./auth");
+// Custom middleware to set secure HTTP headers (Clickjacking, MIME-sniffing, CSP)
+const securityHeaders = (req, res, next) => {
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Content-Security-Policy', "default-src 'self'; " +
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com translate.googleapis.com; " +
+        "font-src 'self' https://fonts.gstatic.com; " +
+        "img-src 'self' data: translate.google.com translate.googleapis.com www.google.com www.google.co.in; " +
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' translate.google.com translate.googleapis.com; " +
+        "connect-src 'self' translate.googleapis.com; " +
+        "frame-src 'self' translate.google.com; " +
+        "frame-ancestors 'none';");
+    next();
+};
+exports.securityHeaders = securityHeaders;
 // Rate limiter for authentication-sensitive endpoints (Login, Register, MFA verify)
 // Rejects brute-force attacks by limiting IP addresses to 5 requests per 15 minutes
 exports.authLimiter = (0, express_rate_limit_1.default)({
@@ -21,7 +37,7 @@ exports.authLimiter = (0, express_rate_limit_1.default)({
 // General rate limiter for standard API endpoints
 exports.generalLimiter = (0, express_rate_limit_1.default)({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
+    max: 500, // Limit each IP to 500 requests per windowMs
     message: {
         status: 429,
         error: 'Too many requests from this IP, please try again later'

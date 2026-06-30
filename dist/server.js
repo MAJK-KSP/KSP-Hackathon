@@ -5,7 +5,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
-const cors_1 = __importDefault(require("cors"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const dotenv_1 = __importDefault(require("dotenv"));
@@ -19,12 +18,9 @@ const PORT = process.env.PORT || 3000;
 // Middleware Setup
 app.use(express_1.default.json());
 app.use((0, cookie_parser_1.default)());
-app.use((0, cors_1.default)({
-    origin: true, // Allow client requests
-    credentials: true, // Allow cookies
-}));
-// Apply general rate limiting to all requests
-app.use(middleware_1.generalLimiter);
+app.use(middleware_1.securityHeaders);
+// Apply general rate limiting to API endpoints only
+app.use('/api', middleware_1.generalLimiter);
 // Serve frontend static files (with fallback for compiled production build)
 const publicPath = fs_1.default.existsSync(path_1.default.join(__dirname, 'public'))
     ? path_1.default.join(__dirname, 'public')
@@ -67,6 +63,50 @@ app.get('/dashboard', async (req, res) => {
         return res.redirect('/');
     }
 });
+app.get('/profile', async (req, res) => {
+    const sessionId = req.cookies.session_id;
+    if (!sessionId) {
+        return res.redirect('/');
+    }
+    try {
+        const user = await (0, auth_1.validateSession)(sessionId);
+        if (!user) {
+            res.clearCookie('session_id', {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+            });
+            return res.redirect('/');
+        }
+        res.sendFile(path_1.default.join(publicPath, 'profile.html'));
+    }
+    catch (err) {
+        console.error('Error during profile redirect check:', err);
+        return res.redirect('/');
+    }
+});
+app.get('/security', async (req, res) => {
+    const sessionId = req.cookies.session_id;
+    if (!sessionId) {
+        return res.redirect('/');
+    }
+    try {
+        const user = await (0, auth_1.validateSession)(sessionId);
+        if (!user) {
+            res.clearCookie('session_id', {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+            });
+            return res.redirect('/');
+        }
+        res.sendFile(path_1.default.join(publicPath, 'security.html'));
+    }
+    catch (err) {
+        console.error('Error during security redirect check:', err);
+        return res.redirect('/');
+    }
+});
 // Serve other static assets (CSS, JS, SVG)
 app.use(express_1.default.static(publicPath));
 // Input validation schema for registration/login
@@ -88,8 +128,11 @@ app.post('/api/auth/login', middleware_1.authLimiter, async (req, res) => {
         }
         // Fetch user
         const user = await (0, db_1.getRow)('SELECT * FROM users WHERE email = ?', [email]);
-        // Constant-time-ish check: run verifyPassword even if user not found to prevent timing attacks
-        const isValid = user ? await (0, auth_1.verifyPassword)(password, user.password_hash) : false;
+        // Mitigate timing attacks: always run verifyPassword even if the user is not found
+        // Using a valid-looking dummy bcrypt hash ensures the computation time is consistent (~100ms)
+        const dummyHash = '$2b$12$dummysalt.dummysalt.dummysalt.dummysalt.dummysalt.du';
+        const hashToVerify = user ? user.password_hash : dummyHash;
+        const isValid = await (0, auth_1.verifyPassword)(password, hashToVerify);
         if (!user || !isValid) {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
@@ -141,9 +184,9 @@ app.post('/api/auth/mfa/setup', middleware_1.authenticateSession, async (req, re
         // Generate TOTP secret
         const { secret, otpauthUrl } = (0, auth_1.generateMfaSecret)(user.email);
         const qrCodeUrl = await (0, auth_1.generateQrCodeDataUrl)(otpauthUrl);
-        // Save the secret temporarily. We do NOT mark mfa_enabled = 1 yet.
-        // It will only be enabled once the user successfully verifies a code.
-        await (0, db_1.runQuery)('UPDATE users SET mfa_secret = ?, mfa_enabled = 0 WHERE id = ?', [secret, user.id]);
+        // Save the secret to temp_mfa_secret. We leave the active mfa_secret and mfa_enabled intact
+        // to prevent locking the user out or disabling their active 2FA until they verify the new setup.
+        await (0, db_1.runQuery)('UPDATE users SET temp_mfa_secret = ? WHERE id = ?', [secret, user.id]);
         return res.status(200).json({
             secret,
             qrCodeUrl,
@@ -189,17 +232,25 @@ app.post('/api/auth/mfa/verify', middleware_1.authLimiter, async (req, res) => {
         }
         // Retrieve user's secret
         const userRecord = await (0, db_1.getRow)('SELECT * FROM users WHERE id = ?', [userId]);
-        if (!userRecord || !userRecord.mfa_secret) {
-            return res.status(400).json({ error: 'MFA has not been set up for this account' });
+        if (!userRecord) {
+            return res.status(400).json({ error: 'User not found' });
+        }
+        const secretToVerify = is_setup ? userRecord.temp_mfa_secret : userRecord.mfa_secret;
+        if (!secretToVerify) {
+            return res.status(400).json({
+                error: is_setup
+                    ? 'MFA setup has not been initiated. Please generate a QR code first.'
+                    : 'MFA has not been set up for this account'
+            });
         }
         // Verify code
-        const isValid = (0, auth_1.verifyTotpToken)(code, userRecord.mfa_secret);
+        const isValid = (0, auth_1.verifyTotpToken)(code, secretToVerify);
         if (!isValid) {
             return res.status(400).json({ error: 'Invalid verification code' });
         }
-        // If this was part of setup, enable MFA permanently
+        // If this was part of setup, promote temp_mfa_secret to mfa_secret and enable MFA permanently
         if (is_setup) {
-            await (0, db_1.runQuery)('UPDATE users SET mfa_enabled = 1 WHERE id = ?', [userId]);
+            await (0, db_1.runQuery)('UPDATE users SET mfa_secret = temp_mfa_secret, temp_mfa_secret = NULL, mfa_enabled = 1 WHERE id = ?', [userId]);
         }
         // Create a new full session for the user
         const session = await (0, auth_1.createSession)(userId, req.headers['user-agent'] || null, req.ip || null);
@@ -247,6 +298,51 @@ app.post('/api/auth/logout', middleware_1.authenticateSession, async (req, res) 
 // 6. Current User Info
 app.get('/api/auth/me', middleware_1.authenticateSession, (req, res) => {
     return res.status(200).json({ user: req.user });
+});
+// 7. Get Officer Profile
+app.get('/api/profile', middleware_1.authenticateSession, async (req, res) => {
+    try {
+        const user = req.user;
+        let profile = await (0, db_1.getRow)('SELECT * FROM officer_profiles WHERE user_id = ?', [user.id]);
+        if (!profile) {
+            profile = {
+                user_id: user.id,
+                badge_number: '',
+                rank: '',
+                post: '',
+                jurisdiction: '',
+                area: '',
+                station: '',
+            };
+        }
+        return res.status(200).json({ success: true, profile });
+    }
+    catch (error) {
+        console.error('Error fetching profile:', error);
+        return res.status(500).json({ error: 'Internal server error fetching profile' });
+    }
+});
+// 8. Update Officer Profile
+app.post('/api/profile', middleware_1.authenticateSession, async (req, res) => {
+    try {
+        const user = req.user;
+        const { badge_number, rank, post, jurisdiction, area, station } = req.body;
+        const existing = await (0, db_1.getRow)('SELECT 1 FROM officer_profiles WHERE user_id = ?', [user.id]);
+        if (existing) {
+            await (0, db_1.runQuery)(`UPDATE officer_profiles 
+         SET badge_number = ?, rank = ?, post = ?, jurisdiction = ?, area = ?, station = ? 
+         WHERE user_id = ?`, [badge_number || '', rank || '', post || '', jurisdiction || '', area || '', station || '', user.id]);
+        }
+        else {
+            await (0, db_1.runQuery)(`INSERT INTO officer_profiles (user_id, badge_number, rank, post, jurisdiction, area, station) 
+         VALUES (?, ?, ?, ?, ?, ?, ?)`, [user.id, badge_number || '', rank || '', post || '', jurisdiction || '', area || '', station || '']);
+        }
+        return res.status(200).json({ success: true, message: 'Profile updated successfully' });
+    }
+    catch (error) {
+        console.error('Error updating profile:', error);
+        return res.status(500).json({ error: 'Internal server error updating profile' });
+    }
 });
 // Initialize DB and start the server
 (0, db_1.initDb)().then(() => {
