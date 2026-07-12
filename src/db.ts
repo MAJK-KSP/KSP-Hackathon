@@ -13,8 +13,10 @@ const db = new sqlite3.Database(dbPath);
 
 // Helper to run raw SQL queries wrapped in Promises
 export const runQuery = (sql: string, params: any[] = []): Promise<{ lastID: number; changes: number }> => {
+  // Convert Postgres placeholders ($1, $2) back to SQLite (?) if they exist
+  const sqliteSql = sql.replace(/\$\d+/g, '?');
   return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
+    db.run(sqliteSql, params, function (err) {
       if (err) {
         reject(err);
       } else {
@@ -26,8 +28,9 @@ export const runQuery = (sql: string, params: any[] = []): Promise<{ lastID: num
 
 // Helper to fetch a single row wrapped in Promises
 export const getRow = <T>(sql: string, params: any[] = []): Promise<T | null> => {
+  const sqliteSql = sql.replace(/\$\d+/g, '?');
   return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
+    db.get(sqliteSql, params, (err, row) => {
       if (err) {
         reject(err);
       } else {
@@ -39,8 +42,9 @@ export const getRow = <T>(sql: string, params: any[] = []): Promise<T | null> =>
 
 // Helper to fetch all rows wrapped in Promises
 export const getAllRows = <T>(sql: string, params: any[] = []): Promise<T[]> => {
+  const sqliteSql = sql.replace(/\$\d+/g, '?');
   return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
+    db.all(sqliteSql, params, (err, rows) => {
       if (err) {
         reject(err);
       } else {
@@ -68,17 +72,11 @@ export const initDb = async () => {
     );
   `);
 
-  // Run a safe migration to add temp_mfa_secret if the table already exists
   try {
     await runQuery('ALTER TABLE users ADD COLUMN temp_mfa_secret TEXT;');
-  } catch (err) {
-    // Column already exists or table doesn't exist yet (handled by CREATE TABLE)
-  }
+  } catch (err) {}
 
-  // Index on email for faster lookups
-  await runQuery(`
-    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-  `);
+  await runQuery(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);`);
 
   // Create sessions table
   await runQuery(`
@@ -107,5 +105,70 @@ export const initDb = async () => {
     );
   `);
 
-  console.log('Database initialized successfully at:', dbPath);
+  // User roles table
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS user_roles (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      role TEXT NOT NULL DEFAULT 'officer',
+      assigned_at TEXT NOT NULL
+    );
+  `);
+
+  // Daily briefings
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS daily_briefings (
+      id TEXT PRIMARY KEY,
+      created_by TEXT NOT NULL REFERENCES users(id),
+      target_user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+      target_role TEXT,
+      target_station TEXT,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      priority TEXT DEFAULT 'normal',
+      effective_date TEXT NOT NULL,
+      expires_at TEXT,
+      created_at TEXT NOT NULL
+    );
+  `);
+
+  await runQuery(`CREATE INDEX IF NOT EXISTS idx_briefings_date ON daily_briefings(effective_date);`);
+
+  // Chat conversations
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS chat_conversations (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  // Chat messages
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      metadata TEXT,
+      created_at TEXT NOT NULL
+    );
+  `);
+
+  await runQuery(`CREATE INDEX IF NOT EXISTS idx_messages_conversation ON chat_messages(conversation_id, created_at);`);
+
+  // AI dataset registry
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS ai_dataset_registry (
+      id TEXT PRIMARY KEY,
+      table_name TEXT NOT NULL UNIQUE,
+      description TEXT,
+      is_enabled INTEGER DEFAULT 1,
+      added_by TEXT REFERENCES users(id),
+      added_at TEXT NOT NULL
+    );
+  `);
+
+  console.log('Database initialized successfully using SQLite at:', dbPath);
 };

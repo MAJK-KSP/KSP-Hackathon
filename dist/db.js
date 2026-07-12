@@ -4,62 +4,49 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initDb = exports.getAllRows = exports.getRow = exports.runQuery = void 0;
-const sqlite3_1 = __importDefault(require("sqlite3"));
-const path_1 = __importDefault(require("path"));
-const fs_1 = __importDefault(require("fs"));
-// Ensure the directory exists
-const dbDir = path_1.default.resolve(__dirname, '..');
-if (!fs_1.default.existsSync(dbDir)) {
-    fs_1.default.mkdirSync(dbDir, { recursive: true });
-}
-const dbPath = path_1.default.join(dbDir, 'auth.db');
-const db = new sqlite3_1.default.Database(dbPath);
+const pg_1 = require("pg");
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config();
+const pool = new pg_1.Pool({
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT || '5432', 10),
+    database: process.env.DB_NAME,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    ssl: { rejectUnauthorized: false },
+});
+// Helper to convert SQLite style parameter placeholders (?) to PostgreSQL ($1, $2, ...)
+const convertSql = (sql) => {
+    let index = 1;
+    return sql.replace(/\?/g, () => `$${index++}`);
+};
 // Helper to run raw SQL queries wrapped in Promises
-const runQuery = (sql, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.run(sql, params, function (err) {
-            if (err) {
-                reject(err);
-            }
-            else {
-                resolve({ lastID: this.lastID, changes: this.changes });
-            }
-        });
-    });
+const runQuery = async (sql, params = []) => {
+    // Skip SQLite-specific PRAGMA statements
+    if (sql.trim().toUpperCase().startsWith('PRAGMA')) {
+        return { lastID: 0, changes: 0 };
+    }
+    const pgSql = convertSql(sql);
+    const result = await pool.query(pgSql, params);
+    return { lastID: 0, changes: result.rowCount || 0 };
 };
 exports.runQuery = runQuery;
 // Helper to fetch a single row wrapped in Promises
-const getRow = (sql, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.get(sql, params, (err, row) => {
-            if (err) {
-                reject(err);
-            }
-            else {
-                resolve(row || null);
-            }
-        });
-    });
+const getRow = async (sql, params = []) => {
+    const pgSql = convertSql(sql);
+    const result = await pool.query(pgSql, params);
+    return result.rows[0] || null;
 };
 exports.getRow = getRow;
 // Helper to fetch all rows wrapped in Promises
-const getAllRows = (sql, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.all(sql, params, (err, rows) => {
-            if (err) {
-                reject(err);
-            }
-            else {
-                resolve(rows);
-            }
-        });
-    });
+const getAllRows = async (sql, params = []) => {
+    const pgSql = convertSql(sql);
+    const result = await pool.query(pgSql, params);
+    return result.rows;
 };
 exports.getAllRows = getAllRows;
 // Initialize the database tables
 const initDb = async () => {
-    // Enable foreign key constraints
-    await (0, exports.runQuery)('PRAGMA foreign_keys = ON;');
     // Create users table
     await (0, exports.runQuery)(`
     CREATE TABLE IF NOT EXISTS users (
@@ -108,6 +95,71 @@ const initDb = async () => {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
   `);
-    console.log('Database initialized successfully at:', dbPath);
+    // --- AI-Ready Tables ---
+    // User roles table (admin vs officer)
+    await (0, exports.runQuery)(`
+    CREATE TABLE IF NOT EXISTS user_roles (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      role TEXT NOT NULL DEFAULT 'officer',
+      assigned_at TEXT NOT NULL
+    );
+  `);
+    // Daily briefings (admin-created instructions for officers)
+    await (0, exports.runQuery)(`
+    CREATE TABLE IF NOT EXISTS daily_briefings (
+      id TEXT PRIMARY KEY,
+      created_by TEXT NOT NULL REFERENCES users(id),
+      target_user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+      target_role TEXT,
+      target_station TEXT,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      priority TEXT DEFAULT 'normal',
+      effective_date TEXT NOT NULL,
+      expires_at TEXT,
+      created_at TEXT NOT NULL
+    );
+  `);
+    // Index on briefing effective_date for faster lookups
+    await (0, exports.runQuery)(`
+    CREATE INDEX IF NOT EXISTS idx_briefings_date ON daily_briefings(effective_date);
+  `);
+    // Chat conversations (one per user session with the AI)
+    await (0, exports.runQuery)(`
+    CREATE TABLE IF NOT EXISTS chat_conversations (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+    // Chat messages within conversations
+    await (0, exports.runQuery)(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      metadata TEXT,
+      created_at TEXT NOT NULL
+    );
+  `);
+    // Index on messages by conversation for fast history retrieval
+    await (0, exports.runQuery)(`
+    CREATE INDEX IF NOT EXISTS idx_messages_conversation ON chat_messages(conversation_id, created_at);
+  `);
+    // AI dataset registry (controls which tables the LLM can query)
+    await (0, exports.runQuery)(`
+    CREATE TABLE IF NOT EXISTS ai_dataset_registry (
+      id TEXT PRIMARY KEY,
+      table_name TEXT NOT NULL UNIQUE,
+      description TEXT,
+      is_enabled INTEGER DEFAULT 1,
+      added_by TEXT REFERENCES users(id),
+      added_at TEXT NOT NULL
+    );
+  `);
+    console.log('Database initialized successfully using Supabase Postgres.');
 };
 exports.initDb = initDb;

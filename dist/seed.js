@@ -38,11 +38,15 @@ async function seed() {
         const createdAt = new Date().toISOString();
         console.log('Creating user in database...');
         await (0, db_1.runQuery)(`INSERT INTO users (id, email, password_hash, created_at) VALUES (?, ?, ?, ?)`, [userId, email, passwordHash, createdAt]);
+        // Assign admin role to the seeded user
+        console.log('Assigning admin role...');
+        await (0, db_1.runQuery)(`INSERT INTO user_roles (user_id, role, assigned_at) VALUES (?, 'admin', ?)`, [userId, createdAt]);
         console.log('\n=============================================');
         console.log('🎉 SUCCESS: Admin Account Created Successfully!');
         console.log('=============================================');
         console.log(`Email:      ${email}`);
         console.log(`User ID:    ${userId}`);
+        console.log(`Role:       admin`);
         console.log('MFA Status: Pending setup on first login');
         console.log('=============================================\n');
         process.exit(0);

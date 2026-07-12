@@ -12,6 +12,7 @@ const zod_1 = require("zod");
 const db_1 = require("./db");
 const auth_1 = require("./auth");
 const middleware_1 = require("./middleware");
+const ai_1 = require("./ai");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3000;
@@ -287,6 +288,8 @@ app.post('/api/profile', middleware_1.authenticateSession, async (req, res) => {
         return res.status(500).json({ error: 'Internal server error updating profile' });
     }
 });
+// Mount AI routes (all require authentication)
+app.use('/api/ai', middleware_1.authenticateSession, ai_1.aiRouter);
 // Initialize DB and start the server
 (0, db_1.initDb)().then(() => {
     app.listen(PORT, () => {

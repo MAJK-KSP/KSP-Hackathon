@@ -24,6 +24,7 @@ import {
   AuthenticatedRequest,
   securityHeaders,
 } from './middleware';
+import { aiRouter } from './ai';
 
 dotenv.config();
 
@@ -369,6 +370,9 @@ app.post('/api/profile', authenticateSession, async (req: AuthenticatedRequest, 
     return res.status(500).json({ error: 'Internal server error updating profile' });
   }
 });
+
+// Mount AI routes (all require authentication)
+app.use('/api/ai', authenticateSession, aiRouter);
 
 // Initialize DB and start the server
 initDb().then(() => {
