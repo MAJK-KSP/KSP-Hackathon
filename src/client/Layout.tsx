@@ -89,6 +89,13 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
               </svg>
               <span>{t("MFA Security")}</span>
             </NavLink>
+
+            <a href="#" className="nav-item" onClick={(e) => { e.preventDefault(); document.getElementById('ai-chat-toggle')?.click(); }}>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg>
+              <span>{t("AI Assistant")}</span>
+            </a>
           </nav>
 
           {/* Bottom: User Details & Logout */}

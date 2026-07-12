@@ -6,6 +6,7 @@ import { Login } from './components/Login';
 import { Dashboard } from './components/Dashboard';
 import { Profile } from './components/Profile';
 import { Security } from './components/Security';
+import { AiChat } from './components/AiChat';
 
 interface User {
   id: string;
@@ -94,6 +95,7 @@ const AppContent: React.FC = () => {
         <Route path="/security" element={<Security user={user} onMfaEnabled={checkSession} />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
+      <AiChat />
     </Layout>
   );
 };

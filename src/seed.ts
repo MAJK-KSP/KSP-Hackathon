@@ -47,11 +47,19 @@ async function seed() {
       [userId, email, passwordHash, createdAt]
     );
 
+    // Assign admin role to the seeded user
+    console.log('Assigning admin role...');
+    await runQuery(
+      `INSERT INTO user_roles (user_id, role, assigned_at) VALUES (?, 'admin', ?)`,
+      [userId, createdAt]
+    );
+
     console.log('\n=============================================');
     console.log('🎉 SUCCESS: Admin Account Created Successfully!');
     console.log('=============================================');
     console.log(`Email:      ${email}`);
     console.log(`User ID:    ${userId}`);
+    console.log(`Role:       admin`);
     console.log('MFA Status: Pending setup on first login');
     console.log('=============================================\n');
 
