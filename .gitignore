@@ -4,4 +4,6 @@ auth.db
 .env
 *.log
 .system_generated/
-.git/
+
+.venv/
+**/__pycache__/

@@ -61,23 +61,37 @@ aiRouter.post('/chat', async (req: RoleAwareRequest, res: Response) => {
       [userMessageId, activeConversationId, message.trim(), now]
     );
 
-    // --- AI RESPONSE PLACEHOLDER ---
-    // When the LLM is integrated, this is where you:
-    // 1. Fetch conversation history from chat_messages
-    // 2. Fetch relevant datasets from ai_dataset_registry
-    // 3. Query the Supabase tables listed in the registry
-    // 4. Build the LLM prompt with context
-    // 5. Call the LLM API
-    // 6. Save and return the response
+    // AI RESPONSE INTEGRATION (FastAPI Proxy)
+    let aiResponse = 'AI Assistant is currently unavailable.';
+    try {
+      const pythonChatUrl = process.env.PYTHON_CHAT_URL || 'http://127.0.0.1:8000/chat';
+      const response = await fetch(pythonChatUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: message.trim() }),
+      });
 
-    const aiResponse = 'AI Assistant is not yet configured. The infrastructure is ready — once an LLM provider is connected, I will be able to answer your queries using all available KSP datasets.';
+      if (response.ok) {
+        const data = await response.json();
+        aiResponse = data.response;
+      } else {
+        const errText = await response.text();
+        aiResponse = `⚠️ **Error**: Failed to generate response from intelligence backend: ${errText}`;
+      }
+    } catch (err: any) {
+      console.error('Error fetching from AI backend:', err);
+      aiResponse = `⚠️ **Error**: Intelligence service is offline. Please verify the FastAPI server is running.`;
+    }
+
     const aiMessageId = crypto.randomUUID();
     const aiTimestamp = new Date().toISOString();
 
     await runQuery(
       `INSERT INTO chat_messages (id, conversation_id, role, content, metadata, created_at)
        VALUES (?, ?, 'assistant', ?, ?, ?)`,
-      [aiMessageId, activeConversationId, aiResponse, JSON.stringify({ placeholder: true }), aiTimestamp]
+      [aiMessageId, activeConversationId, aiResponse, JSON.stringify({ placeholder: false }), aiTimestamp]
     );
 
     return res.status(200).json({

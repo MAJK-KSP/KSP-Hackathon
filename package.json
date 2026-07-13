@@ -8,7 +8,8 @@
     "build:client": "vite build",
     "build:server": "tsc",
     "start": "node dist/server.js",
-    "dev": "concurrently \"nodemon src/server.ts\" \"vite\""
+    "dev": "concurrently \"nodemon src/server.ts\" \"vite\" \"npm run dev:backend\"",
+    "dev:backend": "cd backend && ..\\.venv\\Scripts\\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload"
   },
   "keywords": [],
   "author": "",

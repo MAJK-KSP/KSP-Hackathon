@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLanguage } from '../LanguageContext';
 
 interface Message {
   id: string;
@@ -15,6 +16,7 @@ interface Conversation {
 }
 
 export const AiChat: React.FC = () => {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -24,6 +26,136 @@ export const AiChat: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Custom markdown inline parser (converts **text** to bold elements)
+  const parseInline = (text: string) => {
+    const parts = text.split(/\*\*([^*]+)\*\*/g);
+    return parts.map((part, idx) => {
+      if (idx % 2 === 1) {
+        return <strong key={idx} style={{ fontWeight: 700 }}>{part}</strong>;
+      }
+      return part;
+    });
+  };
+
+  // Custom markdown block parser (converts markdown block headers, lists, tables, paragraphs to React JSX)
+  const parseMarkdown = (markdown: string) => {
+    if (!markdown) return null;
+    
+    const lines = markdown.split('\n');
+    const elements: React.ReactNode[] = [];
+    let listItems: string[] = [];
+    let inList = false;
+
+    const flushList = (keyIndex: number) => {
+      if (listItems.length > 0) {
+        elements.push(
+          <ul key={`ul-${keyIndex}`} style={{ paddingLeft: '20px', margin: '8px 0', listStyleType: 'square' }}>
+            {listItems.map((item, idx) => (
+              <li key={`li-${keyIndex}-${idx}`} style={{ fontSize: '0.9rem', marginBottom: '4px' }}>{parseInline(item)}</li>
+            ))}
+          </ul>
+        );
+        listItems = [];
+      }
+    };
+
+    let tableRows: string[][] = [];
+    let inTable = false;
+
+    const flushTable = (keyIndex: number) => {
+      if (tableRows.length > 0) {
+        const hasHeaders = tableRows.length > 1; // Simplistic header check
+        const headers = hasHeaders ? tableRows[0] : [];
+        const rows = hasHeaders ? tableRows.slice(1) : tableRows;
+
+        elements.push(
+          <div key={`table-wrapper-${keyIndex}`} style={{ overflowX: 'auto', margin: '12px 0', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
+              {hasHeaders && (
+                <thead>
+                  <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #e2e8f0' }}>
+                    {headers.map((h, idx) => (
+                      <th key={`th-${idx}`} style={{ padding: '8px 12px', fontWeight: 'bold', color: '#1e293b' }}>{parseInline(h)}</th>
+                    ))}
+                  </tr>
+                </thead>
+              )}
+              <tbody>
+                {rows.map((row, rIdx) => (
+                  <tr key={`tr-${rIdx}`} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: rIdx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                    {row.map((cell, cIdx) => (
+                      <td key={`td-${cIdx}`} style={{ padding: '8px 12px', color: '#334155' }}>{parseInline(cell)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        tableRows = [];
+      }
+    };
+
+    lines.forEach((line, index) => {
+      const trimmed = line.trim();
+      
+      // Table row check: starts and ends with |
+      if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+        if (inList) {
+          flushList(index);
+          inList = false;
+        }
+        inTable = true;
+        
+        // Skip separator line (e.g., |---|---|)
+        if (trimmed.includes('---')) {
+          return;
+        }
+
+        const cells = trimmed.split('|').map(c => c.trim()).filter((c, idx, arr) => idx > 0 && idx < arr.length - 1);
+        tableRows.push(cells);
+      } else {
+        if (inTable) {
+          flushTable(index);
+          inTable = false;
+        }
+
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+          inList = true;
+          listItems.push(trimmed.substring(2));
+        } else {
+          if (inList) {
+            flushList(index);
+            inList = false;
+          }
+
+          if (trimmed.startsWith('#### ')) {
+            elements.push(<h4 key={index} style={{ fontSize: '0.95rem', fontWeight: 'bold', margin: '12px 0 6px 0' }}>{parseInline(trimmed.substring(5))}</h4>);
+          } else if (trimmed.startsWith('### ')) {
+            elements.push(<h3 key={index} style={{ fontSize: '1.05rem', fontWeight: 'bold', margin: '14px 0 8px 0' }}>{parseInline(trimmed.substring(4))}</h3>);
+          } else if (trimmed.startsWith('## ')) {
+            elements.push(<h2 key={index} style={{ fontSize: '1.15rem', fontWeight: 'bold', margin: '16px 0 10px 0' }}>{parseInline(trimmed.substring(3))}</h2>);
+          } else if (trimmed.startsWith('# ')) {
+            elements.push(<h1 key={index} style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: '18px 0 12px 0' }}>{parseInline(trimmed.substring(2))}</h1>);
+          } else if (trimmed === '---') {
+            elements.push(<hr key={index} style={{ border: 0, height: '1px', background: '#e2e8f0', margin: '16px 0' }} />);
+          } else if (trimmed.length > 0) {
+            elements.push(<p key={index} style={{ marginBottom: '8px', fontSize: '0.9rem', lineHeight: '1.4' }}>{parseInline(trimmed)}</p>);
+          }
+        }
+      }
+    });
+
+    if (inList) {
+      flushList(lines.length);
+    }
+    if (inTable) {
+      flushTable(lines.length);
+    }
+
+    return elements;
+  };
 
   // Scroll to bottom when messages update
   useEffect(() => {
@@ -206,8 +338,8 @@ export const AiChat: React.FC = () => {
               <div>
                 <span className="ai-chat-title">KSP AI Assistant</span>
                 <span className="ai-chat-status">
-                  <span className="status-dot pending"></span>
-                  Awaiting Configuration
+                  <span className="status-dot online" style={{ backgroundColor: '#10b981' }}></span>
+                  {t('Online')}
                 </span>
               </div>
             </div>
@@ -306,7 +438,7 @@ export const AiChat: React.FC = () => {
                   </div>
                 )}
                 <div className="ai-msg-bubble">
-                  <div className="ai-msg-content">{msg.content}</div>
+                  <div className="ai-msg-content">{parseMarkdown(msg.content)}</div>
                   <span className="ai-msg-time">{formatTime(msg.created_at)}</span>
                 </div>
               </div>

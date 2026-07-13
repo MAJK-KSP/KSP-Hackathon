@@ -371,6 +371,90 @@ app.post('/api/profile', authenticateSession, async (req: AuthenticatedRequest, 
   }
 });
 
+// 9. AI Daily Operational Brief (Proxy to Python Backend)
+app.get('/api/daily-brief', authenticateSession, async (req: AuthenticatedRequest, res) => {
+  try {
+    const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'http://127.0.0.1:8000/daily-brief';
+    const response = await fetch(pythonBackendUrl);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorJson;
+      try {
+        errorJson = JSON.parse(errorText);
+      } catch {
+        errorJson = null;
+      }
+      return res.status(response.status).json({ 
+        error: errorJson?.detail || errorJson?.error || errorText || 'Failed to fetch daily brief from backend' 
+      });
+    }
+    
+    const data = await response.json();
+    return res.status(200).json(data);
+  } catch (error: any) {
+    console.error('Error fetching daily brief:', error);
+    if (error.code === 'ECONNREFUSED' || error.message?.includes('fetch failed')) {
+      return res.status(503).json({
+        error: 'Intelligence backend service is offline. Please ensure the FastAPI server is running.'
+      });
+    }
+    return res.status(500).json({ error: 'Internal server error fetching daily brief' });
+  }
+});
+
+// 10. System Status Diagnostics
+app.get('/api/system/status', authenticateSession, async (req: AuthenticatedRequest, res) => {
+  try {
+    // 1. Verify SQLite local connection by running a basic query
+    let sqliteConnected = false;
+    try {
+      await getRow('SELECT 1;');
+      sqliteConnected = true;
+    } catch (err) {
+      console.error('SQLite connection diagnostic failure:', err);
+    }
+
+    // 2. Query FastAPI backend status
+    let fastapiConnected = false;
+    let supabaseDb = { connected: false, error: 'FastAPI backend is offline' };
+    let ollama = { connected: false, error: 'FastAPI backend is offline', model: 'unknown' };
+
+    try {
+      const pythonStatusUrl = process.env.PYTHON_STATUS_URL || 'http://127.0.0.1:8000/status';
+      const response = await fetch(pythonStatusUrl);
+      if (response.ok) {
+        const data = await response.json();
+        fastapiConnected = true;
+        supabaseDb = data.supabase_db || supabaseDb;
+        ollama = data.ollama || ollama;
+      } else {
+        const errorText = await response.text();
+        supabaseDb.error = `FastAPI returned HTTP ${response.status}: ${errorText}`;
+        ollama.error = `FastAPI returned HTTP ${response.status}: ${errorText}`;
+      }
+    } catch (err: any) {
+      console.error('FastAPI health check query failed:', err);
+      supabaseDb.error = err.message || 'Connection refused';
+      ollama.error = err.message || 'Connection refused';
+    }
+
+    return res.status(200).json({
+      sqlite_db: {
+        connected: sqliteConnected
+      },
+      fastapi_backend: {
+        connected: fastapiConnected,
+        supabase_db: supabaseDb,
+        ollama: ollama
+      }
+    });
+  } catch (error: any) {
+    console.error('Error fetching system status:', error);
+    return res.status(500).json({ error: 'Internal server error running diagnostics' });
+  }
+});
+
 // Mount AI routes (all require authentication)
 app.use('/api/ai', authenticateSession, aiRouter);
 
