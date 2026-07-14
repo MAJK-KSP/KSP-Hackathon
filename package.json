@@ -5,11 +5,11 @@
   "main": "dist/server.js",
   "scripts": {
     "build": "npm run build:client && npm run build:server",
-    "build:client": "vite build",
-    "build:server": "tsc",
+    "build:client": "vite build --config frontend/vite.config.ts",
+    "build:server": "tsc -p backend/node/tsconfig.json",
     "start": "node dist/server.js",
-    "dev": "concurrently \"nodemon src/server.ts\" \"vite\" \"npm run dev:backend\"",
-    "dev:backend": "cd backend && ..\\.venv\\Scripts\\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload"
+    "dev": "concurrently \"nodemon --watch backend/node --ext ts,js --exec ts-node backend/node/server.ts\" \"vite frontend\" \"npm run dev:backend\"",
+    "dev:backend": "cd backend/python && ..\\..\\.venv\\Scripts\\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload"
   },
   "keywords": [],
   "author": "",
@@ -46,6 +46,7 @@
     "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^6.0.3",
     "concurrently": "^10.0.3",
+    "localtunnel": "^2.0.2",
     "nodemon": "^3.1.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.2",

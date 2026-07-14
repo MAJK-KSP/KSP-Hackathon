@@ -20,8 +20,9 @@ import httpx
 import json
 
 class OllamaFixTransport(httpx.AsyncHTTPTransport):
-    """Custom transport to intercept and patch Ollama's response finish_reason from null to 'stop'."""
+    """Custom transport to intercept and patch Ollama's response finish_reason from null to 'stop', using Connection: close to prevent hangs."""
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        request.headers["Connection"] = "close"
         response = await super().handle_async_request(request)
         if "/chat/completions" in str(request.url):
             await response.aread()
@@ -30,8 +31,12 @@ class OllamaFixTransport(httpx.AsyncHTTPTransport):
                 if "choices" in data:
                     modified = False
                     for choice in data["choices"]:
+                        msg = choice.get("message", {})
                         if choice.get("finish_reason") is None:
-                            choice["finish_reason"] = "stop"
+                            if msg.get("tool_calls"):
+                                choice["finish_reason"] = "tool_calls"
+                            else:
+                                choice["finish_reason"] = "stop"
                             modified = True
                     if modified:
                         response._content = json.dumps(data).encode("utf-8")

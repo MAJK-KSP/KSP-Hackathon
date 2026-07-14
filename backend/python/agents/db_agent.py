@@ -1,9 +1,6 @@
 import logging
 import re
 from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIModel
-from pydantic_ai.providers.ollama import OllamaProvider
-from config import settings
 from services.db import get_db_connection
 from llm.ollama_client import get_ollama_model
 
@@ -84,11 +81,14 @@ RULES OF ENGAGEMENT:
 3. Present your findings in a clean markdown table.
 4. If no matching records are returned, output: "No records found matching your query."
 5. You are strictly allowed to run only read-only SELECT or WITH statements.
+6. If the user asks for a brief, summary, or general description of the database or what is in it, you must still query the database first (for example, by selecting counts from the views, such as `SELECT count(*) FROM overnight_incidents;` or similar) to ground your answer before giving the overview.
+7. If the tool returns an error, use the error details to formulate a corrected SQL query and execute it again.
 """
 
 db_agent = Agent(
     model=model,
     system_prompt=system_prompt,
+    retries=3,
 )
 
 @db_agent.tool_plain

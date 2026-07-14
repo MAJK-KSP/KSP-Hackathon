@@ -2,13 +2,13 @@ import sqlite3 from 'sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-// Ensure the directory exists
-const dbDir = path.resolve(__dirname, '..');
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
+// Find project root by climbing up until package.json is found
+let rootDir = __dirname;
+while (!fs.existsSync(path.join(rootDir, 'package.json')) && path.dirname(rootDir) !== rootDir) {
+  rootDir = path.dirname(rootDir);
 }
 
-const dbPath = path.join(dbDir, 'auth.db');
+const dbPath = path.join(rootDir, 'auth.db');
 const db = new sqlite3.Database(dbPath);
 
 // Helper to run raw SQL queries wrapped in Promises

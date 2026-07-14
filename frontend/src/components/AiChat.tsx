@@ -256,7 +256,7 @@ export const AiChat: React.FC = () => {
           {
             id: `err-${Date.now()}`,
             role: 'assistant',
-            content: 'Sorry, something went wrong. Please try again.',
+            content: t('Sorry, something went wrong. Please try again.'),
             created_at: new Date().toISOString(),
           },
         ]);
@@ -267,7 +267,7 @@ export const AiChat: React.FC = () => {
         {
           id: `err-${Date.now()}`,
           role: 'assistant',
-          content: 'Network error. Please check your connection.',
+          content: t('Network error. Please check your connection.'),
           created_at: new Date().toISOString(),
         },
       ]);
@@ -305,7 +305,7 @@ export const AiChat: React.FC = () => {
         id="ai-chat-toggle"
         className={`ai-chat-fab ${isOpen ? 'active' : ''}`}
         onClick={toggleChat}
-        title="AI Assistant"
+        title={t('AI Assistant')}
       >
         {isOpen ? (
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -336,7 +336,7 @@ export const AiChat: React.FC = () => {
                 </svg>
               </div>
               <div>
-                <span className="ai-chat-title">KSP AI Assistant</span>
+                <span className="ai-chat-title">{t('KSP AI Assistant')}</span>
                 <span className="ai-chat-status">
                   <span className="status-dot online" style={{ backgroundColor: '#10b981' }}></span>
                   {t('Online')}
@@ -347,14 +347,14 @@ export const AiChat: React.FC = () => {
               <button
                 className="ai-header-btn"
                 onClick={() => { setShowHistory(!showHistory); if (!showHistory) fetchConversations(); }}
-                title="Chat History"
+                title={t('Chat History')}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10"></circle>
                   <polyline points="12 6 12 12 16 14"></polyline>
                 </svg>
               </button>
-              <button className="ai-header-btn" onClick={startNewConversation} title="New Chat">
+              <button className="ai-header-btn" onClick={startNewConversation} title={t('New Chat')}>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="5" x2="12" y2="19"></line>
                   <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -367,7 +367,7 @@ export const AiChat: React.FC = () => {
           {showHistory && (
             <div className="ai-chat-history">
               <div className="ai-history-header">
-                <span>Conversations</span>
+                <span>{t('Conversations')}</span>
                 <button className="ai-header-btn small" onClick={() => setShowHistory(false)}>
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -376,7 +376,7 @@ export const AiChat: React.FC = () => {
                 </button>
               </div>
               {conversations.length === 0 ? (
-                <div className="ai-history-empty">No conversations yet</div>
+                <div className="ai-history-empty">{t('No conversations yet')}</div>
               ) : (
                 <div className="ai-history-list">
                   {conversations.map(conv => (
@@ -385,13 +385,13 @@ export const AiChat: React.FC = () => {
                       className={`ai-history-item ${activeConversationId === conv.id ? 'active' : ''}`}
                       onClick={() => loadConversation(conv.id)}
                     >
-                      <span className="ai-history-title">{conv.title || 'Untitled'}</span>
+                      <span className="ai-history-title">{conv.title || t('Untitled')}</span>
                       <div className="ai-history-meta">
                         <span>{formatTime(conv.updated_at)}</span>
                         <button
                           className="ai-history-delete"
                           onClick={e => { e.stopPropagation(); deleteConversation(conv.id); }}
-                          title="Delete"
+                          title={t('Delete')}
                         >
                           ×
                         </button>
@@ -412,17 +412,17 @@ export const AiChat: React.FC = () => {
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                   </svg>
                 </div>
-                <h4>KSP AI Assistant</h4>
-                <p>Ask questions about cases, datasets, policies, or get your daily briefing.</p>
+                <h4>{t('KSP AI Assistant')}</h4>
+                <p>{t('Ask questions about cases, datasets, policies, or get your daily briefing.')}</p>
                 <div className="ai-welcome-chips">
                   <button className="ai-chip" onClick={() => { setInput("What's my briefing for today?"); }}>
-                    📋 Today's Briefing
+                    {t('📋 Today\'s Briefing')}
                   </button>
                   <button className="ai-chip" onClick={() => { setInput('Show recent updates'); }}>
-                    📊 Recent Updates
+                    {t('📊 Recent Updates')}
                   </button>
                   <button className="ai-chip" onClick={() => { setInput('Help me with a query'); }}>
-                    🔍 Query Help
+                    {t('🔍 Query Help')}
                   </button>
                 </div>
               </div>
@@ -466,7 +466,7 @@ export const AiChat: React.FC = () => {
             <textarea
               ref={inputRef}
               className="ai-chat-input"
-              placeholder="Ask the KSP AI Assistant..."
+              placeholder={t('Ask the KSP AI Assistant...')}
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -477,7 +477,7 @@ export const AiChat: React.FC = () => {
               className="ai-send-btn"
               onClick={sendMessage}
               disabled={!input.trim() || loading}
-              title="Send Message"
+              title={t('Send Message')}
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13"></line>

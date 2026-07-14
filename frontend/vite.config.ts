@@ -4,11 +4,11 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
-  envDir: path.resolve(__dirname),
+  envDir: path.resolve(__dirname, '..'),
   envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
-  root: path.resolve(__dirname, 'src/client'),
+  root: path.resolve(__dirname),
   build: {
-    outDir: path.resolve(__dirname, 'dist/public'),
+    outDir: path.resolve(__dirname, '../dist/public'),
     emptyOutDir: true,
   },
   server: {

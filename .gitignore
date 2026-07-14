@@ -1,9 +1,4 @@
 node_modules/
-dist/
-auth.db
-.env
-*.log
-.system_generated/
-
 .venv/
 **/__pycache__/
+
