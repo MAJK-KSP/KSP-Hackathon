@@ -1,6 +1,12 @@
+/**
+ * @file auth.ts (middleware)
+ * @description Authentication and security middleware, including rate limiting, security headers, and session verification.
+ * Part of the Node.js backend.
+ */
+
 import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
-import { validateSession, User } from './auth';
+import { validateSession, User } from '../services/auth';
 
 // Custom interface to extend Express Request with the validated user
 export interface AuthenticatedRequest extends Request {
@@ -13,7 +19,7 @@ export const securityHeaders = (
   res: Response,
   next: NextFunction
 ) => {
-  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader(
@@ -25,7 +31,7 @@ export const securityHeaders = (
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' translate.google.com translate.googleapis.com; " +
     "connect-src 'self' translate.googleapis.com; " +
     "frame-src 'self' translate.google.com; " +
-    "frame-ancestors 'none';"
+    "frame-ancestors 'self';"
   );
   next();
 };

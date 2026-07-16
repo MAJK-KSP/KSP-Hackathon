@@ -1,10 +1,16 @@
+/**
+ * @file server.ts
+ * @description Main application server for the Node.js backend. Sets up Express middleware, API endpoints for authentication/MFA, and routes for React SPA.
+ * Part of the Node.js backend.
+ */
+
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import { z } from 'zod';
-import { initDb, getRow, runQuery } from './db';
+import { initDb, getRow, runQuery } from './config/db';
 import {
   hashPassword,
   verifyPassword,
@@ -16,20 +22,20 @@ import {
   revokeSession,
   User,
   passwordSchema,
-} from './auth';
+} from './services/auth';
 import {
   authLimiter,
   generalLimiter,
   authenticateSession,
   AuthenticatedRequest,
   securityHeaders,
-} from './middleware';
-import { aiRouter } from './ai';
+} from './middleware/auth';
+import { aiRouter } from './routes/ai';
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.X_ZOHO_CATALYST_LISTEN_PORT || process.env.PORT || 3000;
 
 // Middleware Setup
 app.use(express.json());

@@ -1,5 +1,11 @@
-import { initDb, getRow, runQuery } from './db';
-import { hashPassword, passwordSchema } from './auth';
+/**
+ * @file seed.ts
+ * @description Database seeding script. Used to initialize the SQLite database and create a default admin user.
+ * Part of the Node.js backend.
+ */
+
+import { initDb, getRow, runQuery } from '../config/db';
+import { hashPassword, passwordSchema } from '../services/auth';
 
 async function seed() {
   const email = process.argv[2];
@@ -7,7 +13,7 @@ async function seed() {
 
   if (!email || !password) {
     console.error('Error: Please provide email and password.');
-    console.log('Usage: npx ts-node src/seed.ts <email> <password>');
+    console.log('Usage: npx ts-node backend/node/scripts/seed.ts <email> <password>');
     process.exit(1);
   }
 

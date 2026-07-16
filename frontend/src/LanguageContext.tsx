@@ -1,3 +1,8 @@
+/**
+ * @file LanguageContext.tsx
+ * @description Context provider for language state, handling translation lookups (English and Kannada) for localization across the dashboard.
+ */
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 // Local Translation Dictionary
@@ -16,6 +21,14 @@ const dictionary: Record<string, string> = {
   "Online": "ಆನ್‌ಲೈನ್",
   "Chat History": "ಸಂಭಾಷಣೆಯ ಇತಿಹಾಸ",
   "New Chat": "ಹೊಸ ಚಾಟ್",
+  "Export PDF": "ಪಿಡಿಎಫ್ ರಫ್ತು",
+  "Evidence Trail & Reasoning Path": "ಸಾಕ್ಷ್ಯಾಧಾರದ ಜಾಡು ಮತ್ತು ತಾರ್ಕಿಕ ಹಾದಿ",
+  "Agent Reasoning Steps": "ಏಜೆಂಟ್ ತಾರ್ಕಿಕ ಹಂತಗಳು",
+  "Database Queries Executed": "ಡೇಟಾಬೇಸ್ ಪ್ರಶ್ನೆಗಳು ಕಾರ್ಯಗತಗೊಂಡಿವೆ",
+  "Report Export Preview": "ವರದಿ ರಫ್ತು ಪೂರ್ವವೀಕ್ಷಣೆ",
+  "Confirm & Download": "ದೃಢೀಕರಿಸಿ ಮತ್ತು ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
+  "Close Preview": "ಪೂರ್ವವೀಕ್ಷಣೆ ಮುಚ್ಚಿ",
+  "Cancel": "ರದ್ದುಮಾಡು",
   "Conversations": "ಸಂಭಾಷಣೆಗಳು",
   "No conversations yet": "ಇನ್ನೂ ಯಾವುದೇ ಸಂಭಾಷಣೆಗಳಿಲ್ಲ",
   "Untitled": "ಶೀರ್ಷಿಕೆ ಇಲ್ಲ",

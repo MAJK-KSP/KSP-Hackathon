@@ -1,3 +1,8 @@
+/**
+ * @file Profile.tsx
+ * @description Officer Profile editor component. Allows viewing and editing specific metadata details including badge number, rank, post, jurisdiction, and station assignment.
+ */
+
 import React, { useState, useEffect, FormEvent } from 'react';
 import { useLanguage } from '../LanguageContext';
 

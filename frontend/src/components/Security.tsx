@@ -1,3 +1,8 @@
+/**
+ * @file Security.tsx
+ * @description MFA Management dashboard. Allows users to configure TOTP authenticator setups (QR code, manual key validation) and toggle two-factor status.
+ */
+
 import React, { useState, FormEvent } from 'react';
 import { useLanguage } from '../LanguageContext';
 

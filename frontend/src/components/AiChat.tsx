@@ -1,3 +1,8 @@
+/**
+ * @file AiChat.tsx
+ * @description Interactive AI Assistant chat terminal. Supports starting new threads, viewing conversation history, managing threads, and rendering assistant markdown responses.
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../LanguageContext';
 
@@ -5,7 +10,12 @@ interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
+  metadata?: {
+    sql_queries?: string[];
+    reasoning_steps?: string[];
+  };
   created_at: string;
+  is_generating?: boolean;
 }
 
 interface Conversation {
@@ -15,17 +25,30 @@ interface Conversation {
   updated_at: string;
 }
 
-export const AiChat: React.FC = () => {
+interface AiChatProps {
+  isFullPage?: boolean;
+}
+
+export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
   const { t } = useLanguage();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(isFullPage);
   const [showHistory, setShowHistory] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Synchronize isOpen state and auto-fetch conversations list for full-page mode
+  useEffect(() => {
+    if (isFullPage) {
+      setIsOpen(true);
+      fetchConversations();
+    }
+  }, [isFullPage]);
 
   // Custom markdown inline parser (converts **text** to bold elements)
   const parseInline = (text: string) => {
@@ -76,7 +99,7 @@ export const AiChat: React.FC = () => {
                 <thead>
                   <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #e2e8f0' }}>
                     {headers.map((h, idx) => (
-                      <th key={`th-${idx}`} style={{ padding: '8px 12px', fontWeight: 'bold', color: '#1e293b' }}>{parseInline(h)}</th>
+                      <th key={`th-${idx}`} style={{ padding: '8px 12px', fontWeight: 'bold', color: '#1e293b', whiteSpace: 'nowrap' }}>{parseInline(h)}</th>
                     ))}
                   </tr>
                 </thead>
@@ -85,7 +108,7 @@ export const AiChat: React.FC = () => {
                 {rows.map((row, rIdx) => (
                   <tr key={`tr-${rIdx}`} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: rIdx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
                     {row.map((cell, cIdx) => (
-                      <td key={`td-${cIdx}`} style={{ padding: '8px 12px', color: '#334155' }}>{parseInline(cell)}</td>
+                      <td key={`td-${cIdx}`} style={{ padding: '8px 12px', color: '#334155', whiteSpace: 'nowrap' }}>{parseInline(cell)}</td>
                     ))}
                   </tr>
                 ))}
@@ -234,7 +257,22 @@ export const AiChat: React.FC = () => {
       content: trimmed,
       created_at: new Date().toISOString(),
     };
-    setMessages(prev => [...prev, tempUserMsg]);
+    
+    // Add placeholder assistant message that we will stream into
+    const assistantMessageId = `assist-${Date.now()}`;
+    const tempAssistantMsg: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      metadata: {
+        sql_queries: [],
+        reasoning_steps: []
+      },
+      created_at: new Date().toISOString(),
+      is_generating: true,
+    };
+
+    setMessages(prev => [...prev, tempUserMsg, tempAssistantMsg]);
 
     try {
       const res = await fetch('/api/ai/chat', {
@@ -246,33 +284,136 @@ export const AiChat: React.FC = () => {
         }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setActiveConversationId(data.conversation_id);
-        setMessages(prev => [...prev, data.message]);
+      if (res.ok && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+
+            try {
+              const data = JSON.parse(line);
+              if (data.type === 'reasoning_step') {
+                setMessages(prev => prev.map(msg => {
+                  if (msg.id === assistantMessageId) {
+                    const steps = msg.metadata?.reasoning_steps || [];
+                    if (!steps.includes(data.content)) {
+                      return {
+                        ...msg,
+                        metadata: {
+                          ...msg.metadata,
+                          reasoning_steps: [...steps, data.content]
+                        }
+                      };
+                    }
+                  }
+                  return msg;
+                }));
+              } else if (data.type === 'sql_query') {
+                setMessages(prev => prev.map(msg => {
+                  if (msg.id === assistantMessageId) {
+                    const queries = msg.metadata?.sql_queries || [];
+                    if (!queries.includes(data.content)) {
+                      return {
+                        ...msg,
+                        metadata: {
+                          ...msg.metadata,
+                          sql_queries: [...queries, data.content]
+                        }
+                      };
+                    }
+                  }
+                  return msg;
+                }));
+              } else if (data.type === 'final_result') {
+                setMessages(prev => prev.map(msg => {
+                  if (msg.id === assistantMessageId) {
+                    return {
+                      ...msg,
+                      content: data.response,
+                      metadata: {
+                        sql_queries: data.sql_queries || msg.metadata?.sql_queries,
+                        reasoning_steps: data.reasoning_steps || msg.metadata?.reasoning_steps
+                      }
+                    };
+                  }
+                  return msg;
+                }));
+              } else if (data.type === 'complete') {
+                setActiveConversationId(data.conversation_id);
+                setMessages(prev => prev.map(msg => {
+                  if (msg.id === assistantMessageId) {
+                    return {
+                      ...msg,
+                      id: data.message.id,
+                      content: data.message.content,
+                      metadata: data.message.metadata,
+                      created_at: data.message.created_at,
+                      is_generating: false
+                    };
+                  }
+                  return msg;
+                }));
+              } else if (data.type === 'error') {
+                setMessages(prev => prev.map(msg => {
+                  if (msg.id === assistantMessageId) {
+                    return {
+                      ...msg,
+                      content: data.error,
+                      is_generating: false
+                    };
+                  }
+                  return msg;
+                }));
+              }
+            } catch (err) {
+              // Ignore line parse errors
+            }
+          }
+        }
       } else {
-        setMessages(prev => [
-          ...prev,
-          {
-            id: `err-${Date.now()}`,
-            role: 'assistant',
-            content: t('Sorry, something went wrong. Please try again.'),
-            created_at: new Date().toISOString(),
-          },
-        ]);
+        setMessages(prev => prev.map(msg => {
+          if (msg.id === assistantMessageId) {
+            return {
+              ...msg,
+              content: t('Sorry, something went wrong. Please try again.'),
+              is_generating: false
+            };
+          }
+          return msg;
+        }));
       }
     } catch (err) {
-      setMessages(prev => [
-        ...prev,
-        {
-          id: `err-${Date.now()}`,
-          role: 'assistant',
-          content: t('Network error. Please check your connection.'),
-          created_at: new Date().toISOString(),
-        },
-      ]);
+      setMessages(prev => prev.map(msg => {
+        if (msg.id === assistantMessageId) {
+          return {
+            ...msg,
+            content: t('Network error. Please check your connection.'),
+            is_generating: false
+          };
+        }
+        return msg;
+      }));
     } finally {
       setLoading(false);
+      setMessages(prev => prev.map(msg => {
+        if (msg.id === assistantMessageId) {
+          return {
+            ...msg,
+            is_generating: false
+          };
+        }
+        return msg;
+      }));
     }
   };
 
@@ -300,31 +441,33 @@ export const AiChat: React.FC = () => {
 
   return (
     <>
-      {/* Floating Chat Button */}
-      <button
-        id="ai-chat-toggle"
-        className={`ai-chat-fab ${isOpen ? 'active' : ''}`}
-        onClick={toggleChat}
-        title={t('AI Assistant')}
-      >
-        {isOpen ? (
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        ) : (
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-            <circle cx="9" cy="10" r="1" fill="currentColor"></circle>
-            <circle cx="12" cy="10" r="1" fill="currentColor"></circle>
-            <circle cx="15" cy="10" r="1" fill="currentColor"></circle>
-          </svg>
-        )}
-      </button>
+      {/* Floating Chat Button (Miniature overlay mode only) */}
+      {!isFullPage && (
+        <button
+          id="ai-chat-toggle"
+          className={`ai-chat-fab ${isOpen ? 'active' : ''}`}
+          onClick={toggleChat}
+          title={t('AI Assistant')}
+        >
+          {isOpen ? (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              <circle cx="9" cy="10" r="1" fill="currentColor"></circle>
+              <circle cx="12" cy="10" r="1" fill="currentColor"></circle>
+              <circle cx="15" cy="10" r="1" fill="currentColor"></circle>
+            </svg>
+          )}
+        </button>
+      )}
 
       {/* Chat Panel */}
       {isOpen && (
-        <div className="ai-chat-panel">
+        <div className={`ai-chat-panel ${isFullPage ? 'full-page' : ''}`}>
           {/* Header */}
           <div className="ai-chat-header">
             <div className="ai-chat-header-left">
@@ -344,6 +487,23 @@ export const AiChat: React.FC = () => {
               </div>
             </div>
             <div className="ai-chat-header-actions">
+              {activeConversationId && (
+                <button
+                  className="ai-header-btn"
+                  onClick={() => {
+                    setShowPreviewModal(true);
+                  }}
+                  title={t('Export PDF')}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                </button>
+              )}
               <button
                 className="ai-header-btn"
                 onClick={() => { setShowHistory(!showHistory); if (!showHistory) fetchConversations(); }}
@@ -438,12 +598,74 @@ export const AiChat: React.FC = () => {
                   </div>
                 )}
                 <div className="ai-msg-bubble">
-                  <div className="ai-msg-content">{parseMarkdown(msg.content)}</div>
+                  {msg.is_generating ? (
+                    <div className="ai-thinking-container">
+                      <div className="ai-thinking-header-loading">
+                        <div className="ai-thinking-spinner"></div>
+                        <span className="ai-thinking-title-text">{t('AI Database Agent is thinking...')}</span>
+                      </div>
+                      {msg.metadata?.reasoning_steps && msg.metadata.reasoning_steps.length > 0 && (
+                        <div className="ai-thinking-steps-list" style={{ marginTop: '10px' }}>
+                          <div className="ai-timeline">
+                            {msg.metadata.reasoning_steps.map((step, idx) => (
+                              <div key={idx} className="ai-timeline-step fade-in-step">
+                                <span className="ai-step-bullet">•</span>
+                                <span className="ai-step-text">{step}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {msg.metadata?.sql_queries && msg.metadata.sql_queries.length > 0 && (
+                        <div className="ai-thinking-queries-list" style={{ marginTop: '8px' }}>
+                          <pre className="ai-sql-block mini">
+                            <code>{msg.metadata.sql_queries[msg.metadata.sql_queries.length - 1]}</code>
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="ai-msg-content">{parseMarkdown(msg.content)}</div>
+                      {msg.role === 'assistant' && msg.metadata && (msg.metadata.sql_queries?.length || msg.metadata.reasoning_steps?.length) ? (
+                        <details className="ai-evidence-accordion">
+                          <summary className="ai-evidence-header">
+                            <span>🔎 {t('Evidence Trail & Reasoning Path')}</span>
+                          </summary>
+                          <div className="ai-evidence-body">
+                            {msg.metadata.reasoning_steps && msg.metadata.reasoning_steps.length > 0 && (
+                              <div className="ai-reasoning-section">
+                                <div className="ai-section-title">🧠 {t('Agent Reasoning Steps')}</div>
+                                <div className="ai-timeline">
+                                  {msg.metadata.reasoning_steps.map((step, idx) => (
+                                    <div key={idx} className="ai-timeline-step">
+                                      <span className="ai-step-bullet">•</span>
+                                      <span className="ai-step-text">{step}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {msg.metadata.sql_queries && msg.metadata.sql_queries.length > 0 && (
+                              <div className="ai-sql-section" style={{ marginTop: '12px' }}>
+                                <div className="ai-section-title">💻 {t('Database Queries Executed')}</div>
+                                {msg.metadata.sql_queries.map((query, idx) => (
+                                  <pre key={idx} className="ai-sql-block">
+                                    <code>{query}</code>
+                                  </pre>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </details>
+                      ) : null}
+                    </>
+                  )}
                   <span className="ai-msg-time">{formatTime(msg.created_at)}</span>
                 </div>
               </div>
             ))}
-            {loading && (
+            {loading && messages.length > 0 && !messages[messages.length - 1].is_generating && (
               <div className="ai-message assistant">
                 <div className="ai-msg-avatar">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -484,6 +706,41 @@ export const AiChat: React.FC = () => {
                 <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
               </svg>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Preview & Download Confirmation Modal */}
+      {showPreviewModal && activeConversationId && (
+        <div className="ai-modal-backdrop" onClick={() => setShowPreviewModal(false)}>
+          <div className="ai-preview-modal" onClick={e => e.stopPropagation()}>
+            <div className="ai-modal-header">
+              <h3>📋 {t('Report Export Preview')}</h3>
+              <button className="ai-modal-close" onClick={() => setShowPreviewModal(false)} title={t('Close Preview')}>
+                ×
+              </button>
+            </div>
+            <div className="ai-modal-body">
+              <iframe
+                className="ai-pdf-preview-frame"
+                src={`/api/ai/conversations/${activeConversationId}/pdf?preview=true`}
+                title="PDF Preview"
+              />
+            </div>
+            <div className="ai-modal-footer">
+              <button className="ai-btn-secondary" onClick={() => setShowPreviewModal(false)}>
+                {t('Cancel')}
+              </button>
+              <button
+                className="ai-btn-primary"
+                onClick={() => {
+                  window.location.href = `/api/ai/conversations/${activeConversationId}/pdf`;
+                  setShowPreviewModal(false);
+                }}
+              >
+                {t('Confirm & Download')}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -1,3 +1,9 @@
+"""
+@file db.py
+@description Supabase PostgreSQL database connection pooling and initialization service.
+Part of the Python backend.
+"""
+
 import logging
 import json
 from pathlib import Path

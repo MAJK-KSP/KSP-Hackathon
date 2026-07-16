@@ -1,3 +1,8 @@
+/**
+ * @file Login.tsx
+ * @description Secure Authentication Login component. Provides fields for email, password, and short-lived MFA TOTP token verification with full status reporting and localization.
+ */
+
 import React, { useState, FormEvent } from 'react';
 import { useLanguage } from '../LanguageContext';
 

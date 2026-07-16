@@ -1,7 +1,7 @@
 {
   "appsail": [
     {
-      "source": ".",
+      "source": "deploy_package",
       "name": "KSPHackathon"
     }
   ]

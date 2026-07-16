@@ -1,4 +1,22 @@
 node_modules/
 .venv/
 **/__pycache__/
+auth.db
+ngrok.exe
+dist/
 
+# Environment files
+.env
+.env.local
+.env.*.local
+backend/python/.env
+
+# Local configuration
+.catalystrc
+
+# IDE / System files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+backend/node/storage/pdf_exports/

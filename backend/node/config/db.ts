@@ -1,3 +1,9 @@
+/**
+ * @file db.ts
+ * @description Database helper module for the SQLite database. Handles table creation, indexes, and connection wrappers.
+ * Part of the Node.js backend.
+ */
+
 import sqlite3 from 'sqlite3';
 import path from 'path';
 import fs from 'fs';
@@ -167,6 +173,20 @@ export const initDb = async () => {
       is_enabled INTEGER DEFAULT 1,
       added_by TEXT REFERENCES users(id),
       added_at TEXT NOT NULL
+    );
+  `);
+
+  // AI audit logs
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS ai_audit_logs (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_query TEXT NOT NULL,
+      ai_response TEXT NOT NULL,
+      sql_queries_run TEXT NOT NULL,
+      time_taken_ms INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      cryptographic_signature TEXT NOT NULL
     );
   `);
 

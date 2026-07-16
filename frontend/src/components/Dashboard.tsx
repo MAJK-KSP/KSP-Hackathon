@@ -1,3 +1,8 @@
+/**
+ * @file Dashboard.tsx
+ * @description Operational intelligence dashboard displaying system status, daily operational briefs (urgent/high/normal/low), intelligence alerts, and recent operational metrics.
+ */
+
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../LanguageContext';
 

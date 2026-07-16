@@ -1,3 +1,8 @@
+/**
+ * @file Layout.tsx
+ * @description Master dashboard layout with fixed sidebar, responsive top banner, dynamic navigation, multi-language support toggle, and standard layout styling.
+ */
+
 import React from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from './LanguageContext';
@@ -29,6 +34,8 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
         return t("Officer Profile");
       case '/security':
         return t("MFA Security");
+      case '/chat':
+        return t("AI Assistant");
       default:
         return t("Overview");
     }
@@ -90,12 +97,12 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
               <span>{t("MFA Security")}</span>
             </NavLink>
 
-            <a href="#" className="nav-item" onClick={(e) => { e.preventDefault(); document.getElementById('ai-chat-toggle')?.click(); }}>
+            <NavLink to="/chat" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
               </svg>
               <span>{t("AI Assistant")}</span>
-            </a>
+            </NavLink>
           </nav>
 
           {/* Bottom: User Details & Logout */}
@@ -126,7 +133,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
         </aside>
 
         {/* Main Content Area */}
-        <div className="main-workspace">
+        <div className={`main-workspace ${location.pathname === '/chat' ? 'chat-page-active' : ''}`}>
           {/* Topbar */}
           <div className="workspace-topbar">
             <div className="page-title">

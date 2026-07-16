@@ -1,3 +1,8 @@
+/**
+ * @file App.tsx
+ * @description Main React Application component. Manages application routes, session validation, authentication state, loading spinner, and global wrappers.
+ */
+
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { LanguageProvider } from './LanguageContext';
@@ -93,9 +98,10 @@ const AppContent: React.FC = () => {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/security" element={<Security user={user} onMfaEnabled={checkSession} />} />
+        <Route path="/chat" element={<AiChat isFullPage={true} />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
-      <AiChat />
+      {location.pathname !== '/chat' && <AiChat isFullPage={false} />}
     </Layout>
   );
 };

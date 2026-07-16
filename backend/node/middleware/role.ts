@@ -1,6 +1,12 @@
+/**
+ * @file role.ts
+ * @description Role-based authorization middleware. Attaches user role to requests and restricts routes by user role.
+ * Part of the Node.js backend.
+ */
+
 import { Response, NextFunction } from 'express';
-import { getRow } from './db';
-import { AuthenticatedRequest } from './middleware';
+import { getRow } from '../config/db';
+import { AuthenticatedRequest } from './auth';
 
 // Extended request interface that includes the user's role
 export interface RoleAwareRequest extends AuthenticatedRequest {

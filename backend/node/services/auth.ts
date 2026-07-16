@@ -1,9 +1,15 @@
+/**
+ * @file auth.ts (services)
+ * @description Core authentication service helpers, handling password validation, hashing, TOTP MFA secret generation, verification, and session management.
+ * Part of the Node.js backend.
+ */
+
 import bcrypt from 'bcryptjs';
 import { authenticator } from 'otplib';
 import qrcode from 'qrcode';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
-import { runQuery, getRow } from './db';
+import { runQuery, getRow } from '../config/db';
 
 // Password Validation Schema using Zod
 export const passwordSchema = z
