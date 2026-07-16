@@ -12,6 +12,17 @@ import crypto from 'crypto';
 
 export const aiRouter = Router();
 
+// Helper to get the Python backend URL dynamically (uses Vercel rewrites in production)
+const getPythonUrl = (endpoint: string): string => {
+  if (process.env.PYTHON_BACKEND_URL) {
+    return process.env.PYTHON_BACKEND_URL.replace(/\/$/, '') + endpoint;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}/api/internal-python${endpoint}`;
+  }
+  return `http://127.0.0.1:8000${endpoint}`;
+};
+
 // Attach user role to all AI routes
 aiRouter.use(attachUserRole);
 
@@ -88,7 +99,7 @@ aiRouter.post('/chat', async (req: RoleAwareRequest, res: Response) => {
     let timeTakenMs = 0;
     
     try {
-      const pythonChatUrl = process.env.PYTHON_CHAT_URL || 'http://127.0.0.1:8000/chat';
+      const pythonChatUrl = getPythonUrl('/chat');
       const response = await fetch(pythonChatUrl, {
         method: 'POST',
         headers: {

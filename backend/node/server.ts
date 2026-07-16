@@ -34,6 +34,17 @@ import { aiRouter } from './routes/ai';
 
 dotenv.config();
 
+// Helper to get the Python backend URL dynamically (uses Vercel rewrites in production)
+export const getPythonUrl = (endpoint: string): string => {
+  if (process.env.PYTHON_BACKEND_URL) {
+    return process.env.PYTHON_BACKEND_URL.replace(/\/$/, '') + endpoint;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}/api/internal-python${endpoint}`;
+  }
+  return `http://127.0.0.1:8000${endpoint}`;
+};
+
 const app = express();
 const PORT = process.env.X_ZOHO_CATALYST_LISTEN_PORT || process.env.PORT || 3000;
 
@@ -382,7 +393,7 @@ app.post('/api/profile', authenticateSession, async (req: AuthenticatedRequest, 
 // 9. AI Daily Operational Brief (Proxy to Python Backend)
 app.get('/api/daily-brief', authenticateSession, async (req: AuthenticatedRequest, res) => {
   try {
-    const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'http://127.0.0.1:8000/daily-brief';
+    const pythonBackendUrl = getPythonUrl('/daily-brief');
     const response = await fetch(pythonBackendUrl);
     
     if (!response.ok) {
@@ -414,13 +425,13 @@ app.get('/api/daily-brief', authenticateSession, async (req: AuthenticatedReques
 // 10. System Status Diagnostics
 app.get('/api/system/status', authenticateSession, async (req: AuthenticatedRequest, res) => {
   try {
-    // 1. Verify SQLite local connection by running a basic query
+    // 1. Verify PostgreSQL cloud connection by running a basic query (reported as sqlite_db to avoid breaking frontend status display)
     let sqliteConnected = false;
     try {
       await getRow('SELECT 1;');
       sqliteConnected = true;
     } catch (err) {
-      console.error('SQLite connection diagnostic failure:', err);
+      console.error('PostgreSQL connection diagnostic failure:', err);
     }
 
     // 2. Query FastAPI backend status
@@ -429,7 +440,7 @@ app.get('/api/system/status', authenticateSession, async (req: AuthenticatedRequ
     let ollama = { connected: false, error: 'FastAPI backend is offline', model: 'unknown' };
 
     try {
-      const pythonStatusUrl = process.env.PYTHON_STATUS_URL || 'http://127.0.0.1:8000/status';
+      const pythonStatusUrl = getPythonUrl('/status');
       const response = await fetch(pythonStatusUrl);
       if (response.ok) {
         const data = await response.json();
@@ -467,10 +478,14 @@ app.get('/api/system/status', authenticateSession, async (req: AuthenticatedRequ
 app.use('/api/ai', authenticateSession, aiRouter);
 
 // Initialize DB and start the server
-initDb().then(() => {
+initDb().catch((err) => {
+  console.error('Failed to initialize database:', err);
+});
+
+if (!process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`Server running securely on http://localhost:${PORT}`);
   });
-}).catch((err) => {
-  console.error('Failed to initialize database:', err);
-});
+}
+
+export default app;

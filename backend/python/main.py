@@ -16,6 +16,11 @@ from services.db import init_db
 # Application Factory
 # ---------------------------------------------------------------------------
 
+import os
+
+# Set root_path in Vercel to support proxy mapping behind /api/internal-python
+root_path = "/api/internal-python" if os.getenv("VERCEL") else ""
+
 app = FastAPI(
     title="Karnataka Police Intelligence Platform",
     description=(
@@ -26,6 +31,7 @@ app = FastAPI(
     version="0.1.0 (Sprint 1)",
     docs_url="/docs",
     redoc_url="/redoc",
+    root_path=root_path,
 )
 
 

@@ -1,69 +1,79 @@
 /**
  * @file db.ts
- * @description Database helper module for the SQLite database. Handles table creation, indexes, and connection wrappers.
+ * @description Database helper module for the PostgreSQL database (Supabase).
+ * Handles connection pooling, query execution, placeholder translation, and schema initialization.
  * Part of the Node.js backend.
  */
 
-import sqlite3 from 'sqlite3';
-import path from 'path';
-import fs from 'fs';
+import { Pool } from 'pg';
+import dotenv from 'dotenv';
 
-// Find project root by climbing up until package.json is found
-let rootDir = __dirname;
-while (!fs.existsSync(path.join(rootDir, 'package.json')) && path.dirname(rootDir) !== rootDir) {
-  rootDir = path.dirname(rootDir);
+dotenv.config();
+
+let connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error("DATABASE_URL environment variable is missing.");
 }
 
-const dbPath = path.join(rootDir, 'auth.db');
-const db = new sqlite3.Database(dbPath);
+// Robust parsing to URL-encode password containing special characters (like '@')
+const prefix = "postgresql://";
+if (connectionString.startsWith(prefix)) {
+  const remainder = connectionString.slice(prefix.length);
+  const parts = remainder.split('@');
+  if (parts.length > 2) {
+    const hostDb = parts[parts.length - 1];
+    const credentials = remainder.slice(0, remainder.lastIndexOf('@'));
+    if (credentials.includes(':')) {
+      const colonIdx = credentials.indexOf(':');
+      const user = credentials.slice(0, colonIdx);
+      const pwd = credentials.slice(colonIdx + 1);
+      const encodedPwd = encodeURIComponent(pwd);
+      connectionString = `${prefix}${user}:${encodedPwd}@${hostDb}`;
+    }
+  }
+}
+
+export const pool = new Pool({
+  connectionString,
+  ssl: {
+    rejectUnauthorized: false // Required for Supabase
+  }
+});
+
+// Helper to convert SQLite-style '?' placeholders to PostgreSQL-style '$1', '$2', ...
+function convertPlaceholders(sql: string): string {
+  let index = 1;
+  return sql.replace(/\?/g, () => `$${index++}`);
+}
 
 // Helper to run raw SQL queries wrapped in Promises
-export const runQuery = (sql: string, params: any[] = []): Promise<{ lastID: number; changes: number }> => {
-  // Convert Postgres placeholders ($1, $2) back to SQLite (?) if they exist
-  const sqliteSql = sql.replace(/\$\d+/g, '?');
-  return new Promise((resolve, reject) => {
-    db.run(sqliteSql, params, function (err) {
-      if (err) {
-        reject(err);
-      } else {
-        resolve({ lastID: this.lastID, changes: this.changes });
-      }
-    });
-  });
+export const runQuery = async (sql: string, params: any[] = []): Promise<{ lastID: number; changes: number }> => {
+  const pgSql = convertPlaceholders(sql);
+  const result = await pool.query(pgSql, params);
+  return { 
+    lastID: 0, 
+    changes: result.rowCount || 0 
+  };
 };
 
 // Helper to fetch a single row wrapped in Promises
-export const getRow = <T>(sql: string, params: any[] = []): Promise<T | null> => {
-  const sqliteSql = sql.replace(/\$\d+/g, '?');
-  return new Promise((resolve, reject) => {
-    db.get(sqliteSql, params, (err, row) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve((row as T) || null);
-      }
-    });
-  });
+export const getRow = async <T>(sql: string, params: any[] = []): Promise<T | null> => {
+  const pgSql = convertPlaceholders(sql);
+  const result = await pool.query(pgSql, params);
+  return (result.rows[0] as T) || null;
 };
 
 // Helper to fetch all rows wrapped in Promises
-export const getAllRows = <T>(sql: string, params: any[] = []): Promise<T[]> => {
-  const sqliteSql = sql.replace(/\$\d+/g, '?');
-  return new Promise((resolve, reject) => {
-    db.all(sqliteSql, params, (err, rows) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(rows as T[]);
-      }
-    });
-  });
+export const getAllRows = async <T>(sql: string, params: any[] = []): Promise<T[]> => {
+  const pgSql = convertPlaceholders(sql);
+  const result = await pool.query(pgSql, params);
+  return result.rows as T[];
 };
 
 // Initialize the database tables
 export const initDb = async () => {
-  // Enable foreign key constraints
-  await runQuery('PRAGMA foreign_keys = ON;');
+  console.log('Initializing PostgreSQL database schema on Supabase...');
 
   // Create users table
   await runQuery(`
@@ -78,36 +88,30 @@ export const initDb = async () => {
     );
   `);
 
-  try {
-    await runQuery('ALTER TABLE users ADD COLUMN temp_mfa_secret TEXT;');
-  } catch (err) {}
-
   await runQuery(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);`);
 
   // Create sessions table
   await runQuery(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       expires_at TEXT NOT NULL,
       created_at TEXT NOT NULL,
       user_agent TEXT,
-      ip_address TEXT,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ip_address TEXT
     );
   `);
 
   // Create officer_profiles table
   await runQuery(`
     CREATE TABLE IF NOT EXISTS officer_profiles (
-      user_id TEXT PRIMARY KEY,
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       badge_number TEXT,
       rank TEXT,
       post TEXT,
       jurisdiction TEXT,
       area TEXT,
-      station TEXT,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      station TEXT
     );
   `);
 
@@ -190,5 +194,5 @@ export const initDb = async () => {
     );
   `);
 
-  console.log('Database initialized successfully using SQLite at:', dbPath);
+  console.log('PostgreSQL database initialized successfully.');
 };
