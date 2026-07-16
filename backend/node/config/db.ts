@@ -34,9 +34,11 @@ if (connectionString.startsWith(prefix)) {
   }
 }
 
+const isLocal = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
+
 export const pool = new Pool({
   connectionString,
-  ssl: {
+  ssl: isLocal ? false : {
     rejectUnauthorized: false // Required for Supabase
   }
 });

@@ -6,6 +6,7 @@
 
 import { initDb, getRow, runQuery } from '../config/db';
 import { hashPassword, passwordSchema } from '../services/auth';
+import crypto from 'crypto';
 
 async function seed() {
   const email = process.argv[2];
