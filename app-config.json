@@ -1,9 +1,0 @@
-{
-	"command": "node dist/server.js",
-	"build_path": ".",
-	"stack": "nodejs24",
-	"env_variables": {},
-	"memory": 256,
-	"scripts": {},
-	"platform": "nodejs"
-}

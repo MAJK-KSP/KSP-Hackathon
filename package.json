@@ -1,7 +1,7 @@
 {
   "name": "secure-auth-app",
   "version": "1.0.0",
-  "description": "A highly secure authentication layer with Node.js, TypeScript, Express, SQLite, and TOTP MFA",
+  "description": "A highly secure authentication layer with Node.js, TypeScript, Express, PostgreSQL / Supabase, and TOTP MFA",
   "main": "dist/server.js",
   "scripts": {
     "build": "npm run build:client && npm run build:server",
