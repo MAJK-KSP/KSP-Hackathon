@@ -22,7 +22,7 @@ export const securityHeaders = (
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com translate.googleapis.com; " +
     "font-src 'self' https://fonts.gstatic.com; " +
     "img-src 'self' data: translate.google.com translate.googleapis.com www.google.com www.google.co.in; " +
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' translate.google.com translate.googleapis.com; " +
+    "script-src 'self' translate.google.com translate.googleapis.com; " +
     "connect-src 'self' translate.googleapis.com; " +
     "frame-src 'self' translate.google.com; " +
     "frame-ancestors 'none';"
@@ -61,7 +61,7 @@ export const authenticateSession = async (
   res: Response,
   next: NextFunction
 ) => {
-  const sessionId = req.cookies.session_id;
+  const sessionId = req.cookies['__Host-session_id'];
 
   if (!sessionId) {
     return res.status(401).json({ error: 'Unauthorized: No session token provided' });
@@ -71,11 +71,12 @@ export const authenticateSession = async (
     const user = await validateSession(sessionId);
 
     if (!user) {
-      // Clear invalid cookie
-      res.clearCookie('session_id', {
+      // Clear invalid cookie using same parameters as set
+      res.clearCookie('__Host-session_id', {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        secure: true,
+        sameSite: 'strict',
+        path: '/',
       });
       return res.status(401).json({ error: 'Unauthorized: Session has expired or is invalid' });
     }

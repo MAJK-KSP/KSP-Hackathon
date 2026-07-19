@@ -107,5 +107,24 @@ export const initDb = async () => {
     );
   `);
 
+  // Create security_logs table
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS security_logs (
+      id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      user_id TEXT,
+      email TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      details TEXT,
+      created_at TEXT NOT NULL
+    );
+  `);
+
+  // Index on security_logs created_at for faster lookup and log rotation
+  await runQuery(`
+    CREATE INDEX IF NOT EXISTS idx_security_logs_created_at ON security_logs(created_at);
+  `);
+
   console.log('Database initialized successfully at:', dbPath);
 };

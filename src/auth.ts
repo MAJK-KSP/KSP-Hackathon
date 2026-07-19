@@ -3,7 +3,72 @@ import { authenticator } from 'otplib';
 import qrcode from 'qrcode';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
+import crypto from 'crypto';
 import { runQuery, getRow } from './db';
+
+const ALGORITHM = 'aes-256-gcm';
+// In production, DB_ENCRYPTION_KEY must be a 32-byte hex string (64 characters).
+// We use a fallback key for development to prevent runtime crashes if not set.
+const FALLBACK_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+const ENCRYPTION_KEY = process.env.DB_ENCRYPTION_KEY || FALLBACK_KEY;
+
+export const encryptSecret = (text: string): string => {
+  const key = Buffer.from(ENCRYPTION_KEY, 'hex');
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+  
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  
+  const tag = cipher.getAuthTag().toString('hex');
+  return `${iv.toString('hex')}:${tag}:${encrypted}`;
+};
+
+export const decryptSecret = (encryptedValue: string): string => {
+  const key = Buffer.from(ENCRYPTION_KEY, 'hex');
+  const parts = encryptedValue.split(':');
+  if (parts.length !== 3) {
+    throw new Error('Invalid encrypted data format.');
+  }
+  
+  const iv = Buffer.from(parts[0], 'hex');
+  const tag = Buffer.from(parts[1], 'hex');
+  const encryptedText = Buffer.from(parts[2], 'hex');
+  
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+  decipher.setAuthTag(tag);
+  
+  let decrypted = decipher.update(encryptedText, undefined, 'utf8');
+  decrypted += decipher.final('utf8');
+  return decrypted;
+};
+
+// Helper for session token hashing
+export const hashSessionId = (id: string): string => {
+  return crypto.createHash('sha256').update(id).digest('hex');
+};
+
+// Helper for security audit logging
+export const logSecurityEvent = async (
+  eventType: string,
+  userId: string | null,
+  email: string | null,
+  ipAddress: string | null,
+  userAgent: string | null,
+  details: string | null
+): Promise<void> => {
+  const logId = uuidv4();
+  const timestamp = new Date().toISOString();
+  try {
+    await runQuery(
+      `INSERT INTO security_logs (id, event_type, user_id, email, ip_address, user_agent, details, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [logId, eventType, userId, email, ipAddress, userAgent, details, timestamp]
+    );
+  } catch (error) {
+    console.error('Failed to log security event:', error);
+  }
+};
 
 // Password Validation Schema using Zod
 export const passwordSchema = z
@@ -75,6 +140,7 @@ export const createSession = async (
   ipAddress: string | null
 ): Promise<Session> => {
   const sessionId = uuidv4();
+  const hashedSessionId = hashSessionId(sessionId);
   const createdAt = new Date().toISOString();
   
   // Session is valid for 1 day
@@ -83,11 +149,11 @@ export const createSession = async (
   await runQuery(
     `INSERT INTO sessions (id, user_id, expires_at, created_at, user_agent, ip_address)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [sessionId, userId, expiresAt, createdAt, userAgent, ipAddress]
+    [hashedSessionId, userId, expiresAt, createdAt, userAgent, ipAddress]
   );
 
   return {
-    id: sessionId,
+    id: sessionId, // Return raw sessionId to be stored in the cookie
     user_id: userId,
     expires_at: expiresAt,
     created_at: createdAt,
@@ -98,6 +164,7 @@ export const createSession = async (
 
 export const validateSession = async (sessionId: string): Promise<User | null> => {
   const now = new Date().toISOString();
+  const hashedSessionId = hashSessionId(sessionId);
   
   // Find session and join with user, ensuring the session has not expired and is not a pending MFA session
   const sessionUser = await getRow<{
@@ -113,7 +180,7 @@ export const validateSession = async (sessionId: string): Promise<User | null> =
      WHERE s.id = ? 
        AND s.expires_at > ? 
        AND (s.user_agent IS NULL OR s.user_agent != 'mfa_pending')`,
-    [sessionId, now]
+    [hashedSessionId, now]
   );
 
   if (!sessionUser) {
@@ -132,7 +199,8 @@ export const validateSession = async (sessionId: string): Promise<User | null> =
 };
 
 export const revokeSession = async (sessionId: string): Promise<void> => {
-  await runQuery('DELETE FROM sessions WHERE id = ?', [sessionId]);
+  const hashedSessionId = hashSessionId(sessionId);
+  await runQuery('DELETE FROM sessions WHERE id = ?', [hashedSessionId]);
 };
 
 export const revokeAllUserSessions = async (userId: string): Promise<void> => {
