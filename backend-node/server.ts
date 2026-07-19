@@ -51,7 +51,7 @@ const publicPath = fs.existsSync(path.resolve(__dirname, '../dist/public'))
   ? path.resolve(__dirname, '../dist/public')
   : fs.existsSync(path.resolve(__dirname, 'public'))
     ? path.resolve(__dirname, 'public')
-    : path.resolve(__dirname, '../src/public');
+    : path.resolve(__dirname, '../frontend/public');
 
 // Page Routes (with Secure Redirects for React SPA)
 app.get(['/', '/dashboard', '/profile', '/security'], async (req, res) => {

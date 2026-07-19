@@ -8,7 +8,7 @@
     "build:client": "vite build",
     "build:server": "tsc",
     "start": "node dist/server.js",
-    "dev": "concurrently \"nodemon src/server.ts\" \"vite\""
+    "dev": "concurrently \"nodemon backend-node/server.ts\" \"vite\""
   },
   "keywords": [],
   "author": "",
