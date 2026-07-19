@@ -188,7 +188,7 @@ aiRouter.post('/chat', async (req: RoleAwareRequest, res: Response) => {
       const auditLogId = crypto.randomUUID();
 
       await runQuery(
-        `INSERT INTO ai_audit_logs (id, user_id, user_query, ai_response, sql_queries_run, time_taken_ms, created_at, cryptographic_signature)
+        `INSERT INTO ai_audit_logs (id, user_id, query_input, response, generated_sql, execution_time_ms, created_at, cryptographic_signature)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           auditLogId,

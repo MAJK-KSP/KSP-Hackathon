@@ -50,6 +50,12 @@ const PORT = process.env.X_ZOHO_CATALYST_LISTEN_PORT || process.env.PORT || 3000
 
 // Middleware Setup
 app.use(express.json());
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof SyntaxError && 'status' in err && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ error: 'Invalid JSON request payload' });
+  }
+  next(err);
+});
 app.use(cookieParser());
 app.use(securityHeaders);
 
