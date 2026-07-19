@@ -26,7 +26,7 @@ app = FastAPI(
     description=(
         "AI-powered operational intelligence platform for Karnataka State Police. "
         "Provides daily operational briefs, crime analysis, and actionable insights "
-        "using local LLM (Ollama/Qwen 3)."
+        "using Zoho Catalyst QuickML (Qwen-35B)."
     ),
     version="0.1.0 (Sprint 1)",
     docs_url="/docs",
@@ -80,8 +80,8 @@ async def health_check():
         "service": "Karnataka Police Intelligence Platform",
         "version": "0.1.0",
         "environment": settings.app_env,
-        "llm_model": settings.ollama_model,
-        "llm_endpoint": settings.ollama_base_url,
+        "llm_model": settings.quickml_model,
+        "llm_endpoint": settings.quickml_base_url,
     }
 
 
@@ -89,7 +89,7 @@ async def health_check():
     "/status",
     tags=["System"],
     summary="Detailed Status Check",
-    description="Checks connections to Supabase PostgreSQL and Ollama.",
+    description="Checks connections to Supabase PostgreSQL and Zoho QuickML.",
 )
 async def detailed_status():
     """Detailed health check for database and LLM connections."""
@@ -104,29 +104,45 @@ async def detailed_status():
     except Exception as e:
         db_error = str(e)
 
-    ollama_connected = False
-    ollama_error = None
+    quickml_connected = False
+    quickml_error = None
     try:
-        import httpx
-        async with httpx.AsyncClient() as client:
-            base_url = settings.ollama_base_url.replace("/v1", "").rstrip("/")
-            resp = await client.get(f"{base_url}/api/tags", timeout=2.0)
-            if resp.status_code == 200:
-                ollama_connected = True
-            else:
-                ollama_error = f"Ollama returned HTTP {resp.status_code}"
+        from llm.quickml_client import get_zoho_token
+        token = await get_zoho_token()
+        if not token:
+            quickml_error = "Zoho access token or refresh token is missing."
+        else:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    settings.quickml_endpoint_url,
+                    headers={
+                        "Content-Type": "application/json",
+                        "CATALYST-ORG": settings.catalyst_org,
+                        "Authorization": f"Zoho-oauthtoken {token}"
+                    },
+                    json={"prompt": "ping", "model": "VL-Qwen3.6-35B-A3B"},
+                    timeout=3.0
+                )
+                if resp.status_code in [200, 400]:
+                    if "INVALID_OAUTHTOKEN" in resp.text:
+                        quickml_error = "Zoho API returned INVALID_OAUTHTOKEN. Please check token validity."
+                    else:
+                        quickml_connected = True
+                else:
+                    quickml_error = f"QuickML endpoint returned HTTP {resp.status_code}"
     except Exception as e:
-        ollama_error = str(e)
+        quickml_error = str(e)
 
     return {
         "supabase_db": {
             "connected": db_connected,
             "error": db_error if not db_connected else None
         },
-        "ollama": {
-            "connected": ollama_connected,
-            "error": ollama_error if not ollama_connected else None,
-            "model": settings.ollama_model
+        "quickml": {
+            "connected": quickml_connected,
+            "error": quickml_error if not quickml_connected else None,
+            "model": "VL-Qwen3.6-35B-A3B"
         }
     }
 
@@ -309,5 +325,7 @@ async def chat_with_db(request: ChatRequest):
             }) + "\n"
 
     return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+
+# Trigger reload comment 6
 
 

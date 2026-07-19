@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from config import settings
-from llm.ollama_client import generate_briefing
+from llm.quickml_client import generate_briefing
 from models.briefing import DailyBriefData, DailyBriefResponse
 from services.daily_brief_service import get_daily_brief_data, ServiceError
 
@@ -54,7 +54,7 @@ async def generate_daily_brief() -> DailyBriefResponse:
     1. Load operational data from the service layer
     2. Load the system prompt
     3. Serialize data for the LLM
-    4. Generate the brief via Ollama
+    4. Generate the brief via Zoho QuickML
     5. Package the response with metadata
 
     Returns:
@@ -63,7 +63,7 @@ async def generate_daily_brief() -> DailyBriefResponse:
     Raises:
         ServiceError: If data loading fails.
         FileNotFoundError: If the prompt file is missing.
-        Exception: If LLM generation fails (e.g., Ollama is down).
+        Exception: If LLM generation fails (e.g., QuickML is down).
     """
     # Step 1: Get structured data
     data: DailyBriefData = get_daily_brief_data()
@@ -85,6 +85,6 @@ async def generate_daily_brief() -> DailyBriefResponse:
         brief=brief_text,
         station_name=data.station_info.station_name,
         generated_at=datetime.now(timezone.utc),
-        model_used=settings.ollama_model,
+        model_used=settings.quickml_model,
         data_source="mock",
     )

@@ -160,7 +160,7 @@ export const Dashboard: React.FC = () => {
         fastapi_backend: {
           connected: false,
           supabase_db: { connected: false, error: 'Failed to contact Express server' },
-          ollama: { connected: false, error: 'Failed to contact Express server', model: 'unknown' }
+          quickml: { connected: false, error: 'Failed to contact Express server', model: 'unknown' }
         }
       });
     } finally {
@@ -651,20 +651,20 @@ export const Dashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 4. Ollama LLM */}
-                <div className={`diag-card-premium ${systemStatus?.fastapi_backend?.ollama?.connected ? 'connected' : 'disconnected'}`}>
+                {/* 4. QuickML LLM */}
+                <div className={`diag-card-premium ${systemStatus?.fastapi_backend?.quickml?.connected ? 'connected' : 'disconnected'}`}>
                   <div className="diag-header">
-                    <span className="diag-label">Intelligence Engine (Ollama)</span>
-                    <span className={`diag-status-light ${systemStatus?.fastapi_backend?.ollama?.connected ? 'green' : 'red'}`}></span>
+                    <span className="diag-label">Intelligence Engine (QuickML)</span>
+                    <span className={`diag-status-light ${systemStatus?.fastapi_backend?.quickml?.connected ? 'green' : 'red'}`}></span>
                   </div>
                   <div className="diag-body-premium">
                     <span className="diag-value">
-                      {systemStatus?.fastapi_backend?.ollama?.connected ? "ACTIVE" : "OFFLINE"}
+                      {systemStatus?.fastapi_backend?.quickml?.connected ? "ACTIVE" : "OFFLINE"}
                     </span>
                     <p className="diag-desc-premium">
-                      {systemStatus?.fastapi_backend?.ollama?.connected 
-                        ? `Model Loaded: ${systemStatus.fastapi_backend.ollama.model}` 
-                        : "LLM instance is currently unreachable. AI Chat assistant will return fallbacks."}
+                      {systemStatus?.fastapi_backend?.quickml?.connected 
+                        ? `Model Loaded: ${systemStatus.fastapi_backend.quickml.model}` 
+                        : "QuickML instance is currently unreachable. AI Chat assistant will return fallbacks."}
                     </p>
                   </div>
                 </div>
@@ -681,10 +681,10 @@ export const Dashboard: React.FC = () => {
                     <>
                       <span className="console-row success">[OK] FastAPI server response received in 18ms.</span>
                       <span className="console-row info">[INFO] Supabase operational node connected. SSL Enabled.</span>
-                      {systemStatus?.fastapi_backend?.ollama?.connected ? (
-                        <span className="console-row success">[OK] Ollama service active. Running model {systemStatus.fastapi_backend.ollama.model}.</span>
+                      {systemStatus?.fastapi_backend?.quickml?.connected ? (
+                        <span className="console-row success">[OK] QuickML service active. Running model {systemStatus.fastapi_backend.quickml.model}.</span>
                       ) : (
-                        <span className="console-row error">[ERROR] Ollama health check returned offline code.</span>
+                        <span className="console-row error">[ERROR] QuickML health check returned offline code.</span>
                       )}
                     </>
                   ) : (

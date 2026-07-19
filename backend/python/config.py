@@ -26,9 +26,15 @@ if _root_env_path.exists():
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    # Ollama / LLM
-    ollama_base_url: str = "http://localhost:11434/v1"
-    ollama_model: str = "qwen3:8b"
+    # Zoho QuickML
+    quickml_base_url: str = "https://api.catalyst.zoho.in"
+    quickml_model: str = "VL-Qwen3.6-35B-A3B"
+    zoho_access_token: str = ""
+    zoho_refresh_token: str = ""
+    zoho_client_id: str = ""
+    zoho_client_secret: str = ""
+    catalyst_org: str = "60076334355"
+    quickml_endpoint_url: str = "https://api.catalyst.zoho.in/quickml/v1/project/54759000000026001/vlm/chat"
 
     # Application
     app_env: str = "development"

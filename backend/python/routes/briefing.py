@@ -27,7 +27,7 @@ router = APIRouter(tags=["Briefing"])
     ),
     responses={
         200: {"description": "Successfully generated daily brief"},
-        503: {"description": "LLM service (Ollama) is unavailable"},
+        503: {"description": "LLM service (QuickML) is unavailable"},
         500: {"description": "Internal server error"},
     },
 )
@@ -56,20 +56,20 @@ async def get_daily_brief():
         raise HTTPException(
             status_code=503,
             detail=(
-                "LLM service (Ollama) is unavailable. "
-                "Ensure Ollama is running on the configured host. "
+                "LLM service (QuickML) is unavailable. "
+                "Ensure Zoho QuickML API is accessible. "
                 f"Details: {str(e)}"
             ),
         )
     except Exception as e:
-        # Catch-all for unexpected errors (Ollama connection issues, etc.)
+        # Catch-all for unexpected errors (QuickML connection issues, etc.)
         error_msg = str(e).lower()
         if "connection" in error_msg or "refused" in error_msg or "timeout" in error_msg:
             raise HTTPException(
                 status_code=503,
                 detail=(
-                    "LLM service (Ollama) appears to be offline. "
-                    "Please ensure Ollama is running with the configured model. "
+                    "LLM service (QuickML) appears to be offline. "
+                    "Please ensure Zoho QuickML API is configured with valid credentials. "
                     f"Details: {str(e)}"
                 ),
             )

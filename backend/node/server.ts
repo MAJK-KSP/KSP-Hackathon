@@ -443,7 +443,7 @@ app.get('/api/system/status', authenticateSession, async (req: AuthenticatedRequ
     // 2. Query FastAPI backend status
     let fastapiConnected = false;
     let supabaseDb = { connected: false, error: 'FastAPI backend is offline' };
-    let ollama = { connected: false, error: 'FastAPI backend is offline', model: 'unknown' };
+    let quickml = { connected: false, error: 'FastAPI backend is offline', model: 'unknown' };
 
     try {
       const pythonStatusUrl = getPythonUrl('/status');
@@ -452,16 +452,16 @@ app.get('/api/system/status', authenticateSession, async (req: AuthenticatedRequ
         const data = await response.json();
         fastapiConnected = true;
         supabaseDb = data.supabase_db || supabaseDb;
-        ollama = data.ollama || ollama;
+        quickml = data.quickml || quickml;
       } else {
         const errorText = await response.text();
         supabaseDb.error = `FastAPI returned HTTP ${response.status}: ${errorText}`;
-        ollama.error = `FastAPI returned HTTP ${response.status}: ${errorText}`;
+        quickml.error = `FastAPI returned HTTP ${response.status}: ${errorText}`;
       }
     } catch (err: any) {
       console.error('FastAPI health check query failed:', err);
       supabaseDb.error = err.message || 'Connection refused';
-      ollama.error = err.message || 'Connection refused';
+      quickml.error = err.message || 'Connection refused';
     }
 
     return res.status(200).json({
@@ -471,7 +471,7 @@ app.get('/api/system/status', authenticateSession, async (req: AuthenticatedRequ
       fastapi_backend: {
         connected: fastapiConnected,
         supabase_db: supabaseDb,
-        ollama: ollama
+        quickml: quickml
       }
     });
   } catch (error: any) {

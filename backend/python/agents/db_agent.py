@@ -8,7 +8,7 @@ import logging
 import re
 from pydantic_ai import Agent
 from services.db import get_db_connection, get_auth_db_connection
-from llm.ollama_client import get_ollama_model
+from llm.quickml_client import get_quickml_model
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -39,8 +39,8 @@ def check_query_is_safe(sql: str) -> bool:
     log_reasoning_step("Safety Validation Passed: Query contains only read-only SELECT/WITH statements.")
     return True
 
-# Initialize model pointing to local Ollama with patch transport
-model = get_ollama_model()
+# Initialize model pointing to Zoho QuickML with patch transport
+model = get_quickml_model()
 
 BASE_SYSTEM_PROMPT = """You are the Karnataka State Police (KSP) Database Analyst Chatbot.
 Your sole purpose is to answer questions by querying the Supabase PostgreSQL database.
@@ -226,6 +226,11 @@ def execute_select_query(sql: str = "", **kwargs) -> str:
     query = sql
     if not query and 'object' in kwargs and isinstance(kwargs['object'], dict) and 'sql' in kwargs['object']:
         query = kwargs['object']['sql']
+        
+    if query:
+        # Strip XML-like tags and markdown code blocks that the LLM may wrap the query in
+        query = re.sub(r"</?(?:sql|query|tool_code|execute_select_query)?>", "", query).strip()
+        query = re.sub(r"```[a-zA-Z]*", "", query).strip()
         
     if not query:
         logger.warning(f"Received empty query request with arguments: sql={sql}, kwargs={kwargs}")
