@@ -13,6 +13,15 @@ from dotenv import load_dotenv
 _env_path = Path(__file__).parent / ".env"
 load_dotenv(_env_path)
 
+# Auto-load root .env if it exists to retrieve Authorization DATABASE_URL
+_root_env_path = Path(__file__).parent.parent.parent / ".env"
+if _root_env_path.exists():
+    from dotenv import dotenv_values
+    _root_env = dotenv_values(_root_env_path)
+    if "DATABASE_URL" in _root_env:
+        import os
+        os.environ.setdefault("AUTH_DATABASE_URL", _root_env["DATABASE_URL"])
+
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
@@ -27,6 +36,7 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "postgresql://postgres:[YOUR-PASSWORD]@db.elvwfsventokcoetasut.supabase.co:5432/postgres"
+    auth_database_url: str = "postgresql://postgres:[YOUR-PASSWORD]@db.zhqzhyzxfewkkfsjevmq.supabase.co:5432/postgres"
 
     class Config:
         env_file = ".env"

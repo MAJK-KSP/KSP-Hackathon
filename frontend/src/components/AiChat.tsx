@@ -29,6 +29,25 @@ interface AiChatProps {
   isFullPage?: boolean;
 }
 
+interface CopySqlButtonProps {
+  text: string;
+  label: string;
+}
+
+const CopySqlButton: React.FC<CopySqlButtonProps> = ({ text, label }) => {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <button className={`ai-copy-sql-btn ${copied ? 'copied' : ''}`} onClick={handleCopy}>
+      {copied ? 'Copied ✓' : label}
+    </button>
+  );
+};
+
 export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
   const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(isFullPage);
@@ -468,177 +487,129 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
       {/* Chat Panel */}
       {isOpen && (
         <div className={`ai-chat-panel ${isFullPage ? 'full-page' : ''}`}>
-          {/* Header */}
-          <div className="ai-chat-header">
-            <div className="ai-chat-header-left">
-              <div className="ai-chat-avatar">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"></path>
-                  <rect x="9" y="12" width="6" height="5" rx="1"></rect>
-                  <path d="M5 20a7 7 0 0 1 14 0"></path>
-                </svg>
+          {isFullPage ? (
+            <div className="ai-chat-fullpage-layout">
+              {/* Sidebar */}
+              <div className="ai-chat-sidebar">
+                <div className="ai-sidebar-header">
+                  <h3>📂 {t('Chat History')}</h3>
+                  <button className="ai-new-chat-btn" onClick={startNewConversation} title={t('New Chat')}>
+                    ➕ {t('New')}
+                  </button>
+                </div>
+                {conversations.length === 0 ? (
+                  <div className="ai-history-empty">{t('No conversations yet')}</div>
+                ) : (
+                  <div className="ai-history-list">
+                    {conversations.map(conv => (
+                      <div
+                        key={conv.id}
+                        className={`ai-history-item ${activeConversationId === conv.id ? 'active' : ''}`}
+                        onClick={() => loadConversation(conv.id)}
+                      >
+                        <span className="ai-history-title">{conv.title || t('Untitled')}</span>
+                        <div className="ai-history-meta">
+                          <span>{formatTime(conv.updated_at)}</span>
+                          <button
+                            className="ai-history-delete"
+                            onClick={e => { e.stopPropagation(); deleteConversation(conv.id); }}
+                            title={t('Delete')}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div>
-                <span className="ai-chat-title">{t('KSP AI Assistant')}</span>
-                <span className="ai-chat-status">
-                  <span className="status-dot online" style={{ backgroundColor: '#10b981' }}></span>
-                  {t('Online')}
-                </span>
-              </div>
-            </div>
-            <div className="ai-chat-header-actions">
-              {activeConversationId && (
-                <button
-                  className="ai-header-btn"
-                  onClick={() => {
-                    setShowPreviewModal(true);
-                  }}
-                  title={t('Export PDF')}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10 9 9 9 8 9"></polyline>
-                  </svg>
-                </button>
-              )}
-              <button
-                className="ai-header-btn"
-                onClick={() => { setShowHistory(!showHistory); if (!showHistory) fetchConversations(); }}
-                title={t('Chat History')}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <polyline points="12 6 12 12 16 14"></polyline>
-                </svg>
-              </button>
-              <button className="ai-header-btn" onClick={startNewConversation} title={t('New Chat')}>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-              </button>
-            </div>
-          </div>
 
-          {/* Conversation History Sidebar */}
-          {showHistory && (
-            <div className="ai-chat-history">
-              <div className="ai-history-header">
-                <span>{t('Conversations')}</span>
-                <button className="ai-header-btn small" onClick={() => setShowHistory(false)}>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                </button>
-              </div>
-              {conversations.length === 0 ? (
-                <div className="ai-history-empty">{t('No conversations yet')}</div>
-              ) : (
-                <div className="ai-history-list">
-                  {conversations.map(conv => (
-                    <div
-                      key={conv.id}
-                      className={`ai-history-item ${activeConversationId === conv.id ? 'active' : ''}`}
-                      onClick={() => loadConversation(conv.id)}
-                    >
-                      <span className="ai-history-title">{conv.title || t('Untitled')}</span>
-                      <div className="ai-history-meta">
-                        <span>{formatTime(conv.updated_at)}</span>
-                        <button
-                          className="ai-history-delete"
-                          onClick={e => { e.stopPropagation(); deleteConversation(conv.id); }}
-                          title={t('Delete')}
-                        >
-                          ×
+              {/* Chat Main Workspace */}
+              <div className="ai-chat-main-container">
+                {/* Header */}
+                <div className="ai-chat-header">
+                  <div className="ai-chat-header-left">
+                    <div className="ai-chat-avatar">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        <polygon points="12 11 9 13 10 9 7 7 11 7 12 3 13 7 17 7 14 9 15 13"></polygon>
+                      </svg>
+                    </div>
+                    <div>
+                      <span className="ai-chat-title">{t('KSP AI Assistant')}</span>
+                      <span className="ai-chat-status">
+                        <span className="status-dot online" style={{ backgroundColor: '#10b981' }}></span>
+                        {t('Online')}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="ai-chat-header-actions">
+                    {activeConversationId && (
+                      <button
+                        className="ai-header-btn"
+                        onClick={() => {
+                          setShowPreviewModal(true);
+                        }}
+                        title={t('Export PDF')}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                          <line x1="16" y1="13" x2="8" y2="13"></line>
+                          <line x1="16" y1="17" x2="8" y2="17"></line>
+                          <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Messages Area */}
+                <div className="ai-chat-messages">
+                  {messages.length === 0 && (
+                    <div className="ai-chat-welcome">
+                      <div className="ai-welcome-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                      </div>
+                      <h4>{t('KSP AI Assistant')}</h4>
+                      <p>{t('Ask questions about cases, datasets, policies, or get your daily briefing.')}</p>
+                      <div className="ai-welcome-chips">
+                        <button className="ai-chip" onClick={() => { setInput("What's my briefing for today?"); }}>
+                          {t('📋 Today\'s Briefing')}
+                        </button>
+                        <button className="ai-chip" onClick={() => { setInput('Show recent updates'); }}>
+                          {t('📊 Recent Updates')}
+                        </button>
+                        <button className="ai-chip" onClick={() => { setInput('Help me with a query'); }}>
+                          {t('🔍 Query Help')}
                         </button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Messages Area */}
-          <div className="ai-chat-messages">
-            {messages.length === 0 && (
-              <div className="ai-chat-welcome">
-                <div className="ai-welcome-icon">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                  </svg>
-                </div>
-                <h4>{t('KSP AI Assistant')}</h4>
-                <p>{t('Ask questions about cases, datasets, policies, or get your daily briefing.')}</p>
-                <div className="ai-welcome-chips">
-                  <button className="ai-chip" onClick={() => { setInput("What's my briefing for today?"); }}>
-                    {t('📋 Today\'s Briefing')}
-                  </button>
-                  <button className="ai-chip" onClick={() => { setInput('Show recent updates'); }}>
-                    {t('📊 Recent Updates')}
-                  </button>
-                  <button className="ai-chip" onClick={() => { setInput('Help me with a query'); }}>
-                    {t('🔍 Query Help')}
-                  </button>
-                </div>
-              </div>
-            )}
-            {messages.map(msg => (
-              <div key={msg.id} className={`ai-message ${msg.role}`}>
-                {msg.role === 'assistant' && (
-                  <div className="ai-msg-avatar">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="3"></circle>
-                      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
-                    </svg>
-                  </div>
-                )}
-                <div className="ai-msg-bubble">
-                  {msg.is_generating ? (
-                    <div className="ai-thinking-container">
-                      <div className="ai-thinking-header-loading">
-                        <div className="ai-thinking-spinner"></div>
-                        <span className="ai-thinking-title-text">{t('AI Database Agent is thinking...')}</span>
-                      </div>
-                      {msg.metadata?.reasoning_steps && msg.metadata.reasoning_steps.length > 0 && (
-                        <div className="ai-thinking-steps-list" style={{ marginTop: '10px' }}>
-                          <div className="ai-timeline">
-                            {msg.metadata.reasoning_steps.map((step, idx) => (
-                              <div key={idx} className="ai-timeline-step fade-in-step">
-                                <span className="ai-step-bullet">•</span>
-                                <span className="ai-step-text">{step}</span>
-                              </div>
-                            ))}
-                          </div>
+                  )}
+                  {messages.map(msg => (
+                    <div key={msg.id} className={`ai-message ${msg.role}`}>
+                      {msg.role === 'assistant' && (
+                        <div className="ai-msg-avatar">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            <polygon points="12 11 9 13 10 9 7 7 11 7 12 3 13 7 17 7 14 9 15 13"></polygon>
+                          </svg>
                         </div>
                       )}
-                      {msg.metadata?.sql_queries && msg.metadata.sql_queries.length > 0 && (
-                        <div className="ai-thinking-queries-list" style={{ marginTop: '8px' }}>
-                          <pre className="ai-sql-block mini">
-                            <code>{msg.metadata.sql_queries[msg.metadata.sql_queries.length - 1]}</code>
-                          </pre>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      <div className="ai-msg-content">{parseMarkdown(msg.content)}</div>
-                      {msg.role === 'assistant' && msg.metadata && (msg.metadata.sql_queries?.length || msg.metadata.reasoning_steps?.length) ? (
-                        <details className="ai-evidence-accordion">
-                          <summary className="ai-evidence-header">
-                            <span>🔎 {t('Evidence Trail & Reasoning Path')}</span>
-                          </summary>
-                          <div className="ai-evidence-body">
-                            {msg.metadata.reasoning_steps && msg.metadata.reasoning_steps.length > 0 && (
-                              <div className="ai-reasoning-section">
-                                <div className="ai-section-title">🧠 {t('Agent Reasoning Steps')}</div>
+                      <div className="ai-msg-bubble">
+                        {msg.is_generating ? (
+                          <div className="ai-thinking-container">
+                            <div className="ai-thinking-header-loading">
+                              <div className="ai-thinking-spinner"></div>
+                              <span className="ai-thinking-title-text">{t('AI Database Agent is thinking...')}</span>
+                            </div>
+                            {msg.metadata?.reasoning_steps && msg.metadata.reasoning_steps.length > 0 && (
+                              <div className="ai-thinking-steps-list" style={{ marginTop: '10px' }}>
                                 <div className="ai-timeline">
                                   {msg.metadata.reasoning_steps.map((step, idx) => (
-                                    <div key={idx} className="ai-timeline-step">
+                                    <div key={idx} className="ai-timeline-step fade-in-step">
                                       <span className="ai-step-bullet">•</span>
                                       <span className="ai-step-text">{step}</span>
                                     </div>
@@ -646,67 +617,348 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
                                 </div>
                               </div>
                             )}
-                            {msg.metadata.sql_queries && msg.metadata.sql_queries.length > 0 && (
-                              <div className="ai-sql-section" style={{ marginTop: '12px' }}>
-                                <div className="ai-section-title">💻 {t('Database Queries Executed')}</div>
-                                {msg.metadata.sql_queries.map((query, idx) => (
-                                  <pre key={idx} className="ai-sql-block">
-                                    <code>{query}</code>
+                            {msg.metadata?.sql_queries && msg.metadata.sql_queries.length > 0 && (
+                              <div className="ai-thinking-queries-list" style={{ marginTop: '8px' }}>
+                                <div className="ai-sql-container">
+                                  <pre className="ai-sql-block mini">
+                                    <code>{msg.metadata.sql_queries[msg.metadata.sql_queries.length - 1]}</code>
                                   </pre>
-                                ))}
+                                  <CopySqlButton text={msg.metadata.sql_queries[msg.metadata.sql_queries.length - 1]} label={t('Copy SQL')} />
+                                </div>
                               </div>
                             )}
                           </div>
-                        </details>
-                      ) : null}
-                    </>
+                        ) : (
+                          <>
+                            <div className="ai-msg-content">{parseMarkdown(msg.content)}</div>
+                            {msg.role === 'assistant' && msg.metadata && (msg.metadata.sql_queries?.length || msg.metadata.reasoning_steps?.length) ? (
+                              <details className="ai-evidence-accordion">
+                                <summary className="ai-evidence-header">
+                                  <span>🔎 {t('Evidence Trail & Reasoning Path')}</span>
+                                </summary>
+                                <div className="ai-evidence-body">
+                                  {msg.metadata.reasoning_steps && msg.metadata.reasoning_steps.length > 0 && (
+                                    <div className="ai-reasoning-section">
+                                      <div className="ai-section-title">🧠 {t('Agent Reasoning Steps')}</div>
+                                      <div className="ai-timeline">
+                                        {msg.metadata.reasoning_steps.map((step, idx) => (
+                                          <div key={idx} className="ai-timeline-step">
+                                            <span className="ai-step-bullet">•</span>
+                                            <span className="ai-step-text">{step}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {msg.metadata.sql_queries && msg.metadata.sql_queries.length > 0 && (
+                                    <div className="ai-sql-section" style={{ marginTop: '12px' }}>
+                                      <div className="ai-section-title">💻 {t('Database Queries Executed')}</div>
+                                      {msg.metadata.sql_queries.map((query, idx) => (
+                                        <div key={idx} className="ai-sql-container" style={{ marginBottom: '8px' }}>
+                                          <pre className="ai-sql-block">
+                                            <code>{query}</code>
+                                          </pre>
+                                          <CopySqlButton text={query} label={t('Copy SQL')} />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </details>
+                            ) : null}
+                          </>
+                        )}
+                        <span className="ai-msg-time">{formatTime(msg.created_at)}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {loading && messages.length > 0 && !messages[messages.length - 1].is_generating && (
+                    <div className="ai-message assistant">
+                      <div className="ai-msg-avatar">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                          <polygon points="12 11 9 13 10 9 7 7 11 7 12 3 13 7 17 7 14 9 15 13"></polygon>
+                        </svg>
+                      </div>
+                      <div className="ai-msg-bubble">
+                        <div className="ai-typing">
+                          <span></span><span></span><span></span>
+                        </div>
+                      </div>
+                    </div>
                   )}
-                  <span className="ai-msg-time">{formatTime(msg.created_at)}</span>
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Input Area */}
+                <div className="ai-chat-input-area">
+                  <textarea
+                    ref={inputRef}
+                    className="ai-chat-input"
+                    placeholder={t('Ask the KSP AI Assistant...')}
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    rows={1}
+                    disabled={loading}
+                  />
+                  <button
+                    className="ai-send-btn"
+                    onClick={sendMessage}
+                    disabled={!input.trim() || loading}
+                    title={t('Send Message')}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="22" y1="2" x2="11" y2="13"></line>
+                      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                  </button>
                 </div>
               </div>
-            ))}
-            {loading && messages.length > 0 && !messages[messages.length - 1].is_generating && (
-              <div className="ai-message assistant">
-                <div className="ai-msg-avatar">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
-                  </svg>
-                </div>
-                <div className="ai-msg-bubble">
-                  <div className="ai-typing">
-                    <span></span><span></span><span></span>
+            </div>
+          ) : (
+            // Popup float mode
+            <>
+              <div className="ai-chat-header">
+                <div className="ai-chat-header-left">
+                  <div className="ai-chat-avatar">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                      <polygon points="12 11 9 13 10 9 7 7 11 7 12 3 13 7 17 7 14 9 15 13"></polygon>
+                    </svg>
+                  </div>
+                  <div>
+                    <span className="ai-chat-title">{t('KSP AI Assistant')}</span>
+                    <span className="ai-chat-status">
+                      <span className="status-dot online" style={{ backgroundColor: '#10b981' }}></span>
+                      {t('Online')}
+                    </span>
                   </div>
                 </div>
+                <div className="ai-chat-header-actions">
+                  {activeConversationId && (
+                    <button
+                      className="ai-header-btn"
+                      onClick={() => setShowPreviewModal(true)}
+                      title={t('Export PDF')}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                      </svg>
+                    </button>
+                  )}
+                  <button
+                    className="ai-header-btn"
+                    onClick={() => { setShowHistory(!showHistory); if (!showHistory) fetchConversations(); }}
+                    title={t('Chat History')}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                  </button>
+                  <button className="ai-header-btn" onClick={startNewConversation} title={t('New Chat')}>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                  </button>
+                </div>
               </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
 
-          {/* Input Area */}
-          <div className="ai-chat-input-area">
-            <textarea
-              ref={inputRef}
-              className="ai-chat-input"
-              placeholder={t('Ask the KSP AI Assistant...')}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              rows={1}
-              disabled={loading}
-            />
-            <button
-              className="ai-send-btn"
-              onClick={sendMessage}
-              disabled={!input.trim() || loading}
-              title={t('Send Message')}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13"></line>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-              </svg>
-            </button>
-          </div>
+              {showHistory && (
+                <div className="ai-chat-history">
+                  <div className="ai-history-header">
+                    <span>{t('Conversations')}</span>
+                    <button className="ai-header-btn small" onClick={() => setShowHistory(false)}>
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                  </div>
+                  {conversations.length === 0 ? (
+                    <div className="ai-history-empty">{t('No conversations yet')}</div>
+                  ) : (
+                    <div className="ai-history-list">
+                      {conversations.map(conv => (
+                        <div
+                          key={conv.id}
+                          className={`ai-history-item ${activeConversationId === conv.id ? 'active' : ''}`}
+                          onClick={() => { loadConversation(conv.id); setShowHistory(false); }}
+                        >
+                          <span className="ai-history-title">{conv.title || t('Untitled')}</span>
+                          <div className="ai-history-meta">
+                            <span>{formatTime(conv.updated_at)}</span>
+                            <button
+                              className="ai-history-delete"
+                              onClick={e => { e.stopPropagation(); deleteConversation(conv.id); }}
+                              title={t('Delete')}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="ai-chat-messages">
+                {messages.length === 0 && (
+                  <div className="ai-chat-welcome">
+                    <div className="ai-welcome-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                      </svg>
+                    </div>
+                    <h4>{t('KSP AI Assistant')}</h4>
+                    <p>{t('Ask questions about cases, datasets, policies, or get your daily briefing.')}</p>
+                    <div className="ai-welcome-chips">
+                      <button className="ai-chip" onClick={() => { setInput("What's my briefing for today?"); }}>
+                        {t('📋 Today\'s Briefing')}
+                      </button>
+                      <button className="ai-chip" onClick={() => { setInput('Show recent updates'); }}>
+                        {t('📊 Recent Updates')}
+                      </button>
+                      <button className="ai-chip" onClick={() => { setInput('Help me with a query'); }}>
+                        {t('🔍 Query Help')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {messages.map(msg => (
+                  <div key={msg.id} className={`ai-message ${msg.role}`}>
+                    {msg.role === 'assistant' && (
+                      <div className="ai-msg-avatar">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                          <polygon points="12 11 9 13 10 9 7 7 11 7 12 3 13 7 17 7 14 9 15 13"></polygon>
+                        </svg>
+                      </div>
+                    )}
+                    <div className="ai-msg-bubble">
+                      {msg.is_generating ? (
+                        <div className="ai-thinking-container">
+                          <div className="ai-thinking-header-loading">
+                            <div className="ai-thinking-spinner"></div>
+                            <span className="ai-thinking-title-text">{t('AI Database Agent is thinking...')}</span>
+                          </div>
+                          {msg.metadata?.reasoning_steps && msg.metadata.reasoning_steps.length > 0 && (
+                            <div className="ai-thinking-steps-list" style={{ marginTop: '10px' }}>
+                              <div className="ai-timeline">
+                                {msg.metadata.reasoning_steps.map((step, idx) => (
+                                  <div key={idx} className="ai-timeline-step fade-in-step">
+                                    <span className="ai-step-bullet">•</span>
+                                    <span className="ai-step-text">{step}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {msg.metadata?.sql_queries && msg.metadata.sql_queries.length > 0 && (
+                            <div className="ai-thinking-queries-list" style={{ marginTop: '8px' }}>
+                              <div className="ai-sql-container">
+                                <pre className="ai-sql-block mini">
+                                  <code>{msg.metadata.sql_queries[msg.metadata.sql_queries.length - 1]}</code>
+                                </pre>
+                                <CopySqlButton text={msg.metadata.sql_queries[msg.metadata.sql_queries.length - 1]} label={t('Copy SQL')} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <div className="ai-msg-content">{parseMarkdown(msg.content)}</div>
+                          {msg.role === 'assistant' && msg.metadata && (msg.metadata.sql_queries?.length || msg.metadata.reasoning_steps?.length) ? (
+                            <details className="ai-evidence-accordion">
+                              <summary className="ai-evidence-header">
+                                <span>🔎 {t('Evidence Trail & Reasoning Path')}</span>
+                              </summary>
+                              <div className="ai-evidence-body">
+                                {msg.metadata.reasoning_steps && msg.metadata.reasoning_steps.length > 0 && (
+                                  <div className="ai-reasoning-section">
+                                    <div className="ai-section-title">🧠 {t('Agent Reasoning Steps')}</div>
+                                    <div className="ai-timeline">
+                                      {msg.metadata.reasoning_steps.map((step, idx) => (
+                                        <div key={idx} className="ai-timeline-step">
+                                          <span className="ai-step-bullet">•</span>
+                                          <span className="ai-step-text">{step}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {msg.metadata.sql_queries && msg.metadata.sql_queries.length > 0 && (
+                                  <div className="ai-sql-section" style={{ marginTop: '12px' }}>
+                                    <div className="ai-section-title">💻 {t('Database Queries Executed')}</div>
+                                    {msg.metadata.sql_queries.map((query, idx) => (
+                                      <div key={idx} className="ai-sql-container" style={{ marginBottom: '8px' }}>
+                                        <pre className="ai-sql-block">
+                                          <code>{query}</code>
+                                        </pre>
+                                        <CopySqlButton text={query} label={t('Copy SQL')} />
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </details>
+                          ) : null}
+                        </>
+                      )}
+                      <span className="ai-msg-time">{formatTime(msg.created_at)}</span>
+                    </div>
+                  </div>
+                ))}
+                {loading && messages.length > 0 && !messages[messages.length - 1].is_generating && (
+                  <div className="ai-message assistant">
+                    <div className="ai-msg-avatar">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        <polygon points="12 11 9 13 10 9 7 7 11 7 12 3 13 7 17 7 14 9 15 13"></polygon>
+                      </svg>
+                    </div>
+                    <div className="ai-msg-bubble">
+                      <div className="ai-typing">
+                        <span></span><span></span><span></span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              <div className="ai-chat-input-area">
+                <textarea
+                  ref={inputRef}
+                  className="ai-chat-input"
+                  placeholder={t('Ask the KSP AI Assistant...')}
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  rows={1}
+                  disabled={loading}
+                />
+                <button
+                  className="ai-send-btn"
+                  onClick={sendMessage}
+                  disabled={!input.trim() || loading}
+                  title={t('Send Message')}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                  </svg>
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 

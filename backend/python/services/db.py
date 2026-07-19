@@ -44,6 +44,27 @@ def get_db_connection():
     
     return psycopg.connect(url, row_factory=dict_row, connect_timeout=3)
 
+def get_auth_db_connection():
+    """Get a direct connection to the Authorization database."""
+    if "[YOUR-PASSWORD]" in settings.auth_database_url:
+        raise ConnectionError("Supabase AUTH_DATABASE_URL is not configured with a valid password.")
+    
+    url = settings.auth_database_url
+    prefix = "postgresql://"
+    if url.startswith(prefix):
+        remainder = url[len(prefix):]
+        if remainder.count("@") > 1:
+            last_at_idx = remainder.rfind("@")
+            creds = remainder[:last_at_idx]
+            host_db = remainder[last_at_idx + 1:]
+            if ":" in creds:
+                user, pwd = creds.split(":", 1)
+                encoded_pwd = urllib.parse.quote_plus(pwd)
+                url = f"{prefix}{user}:{encoded_pwd}@{host_db}"
+    
+    return psycopg.connect(url, row_factory=dict_row, connect_timeout=3)
+
+
 def init_db():
     """Initialize the Supabase database schema and seed initial mock data."""
     if "[YOUR-PASSWORD]" in settings.database_url:

@@ -1630,14 +1630,20 @@ body {
   position: absolute;
   top: 72px;
   left: 0;
-  right: 0;
+  width: 320px;
   bottom: 0;
   background-color: #ffffff;
   z-index: 10;
   display: flex;
   flex-direction: column;
-  border-top: 1px solid var(--border-color);
-  animation: fadeIn 0.2s ease;
+  border-right: 1px solid var(--border-color);
+  box-shadow: 10px 0 30px rgba(15, 23, 42, 0.1);
+  animation: chatHistorySlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes chatHistorySlideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
 }
 
 .ai-history-header {
@@ -3824,5 +3830,279 @@ body {
   }
 }
 
+/* AI Chat Split-Pane Workspace Layout (Full Page Mode) */
+.ai-chat-fullpage-layout {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #f8fafc;
+}
 
+.ai-chat-sidebar {
+  width: 290px;
+  background-color: #ffffff;
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  flex-shrink: 0;
+  z-index: 5;
+}
 
+.ai-sidebar-header {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #ffffff;
+}
+
+.ai-sidebar-header h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ksp-navy);
+  margin: 0;
+}
+
+.ai-new-chat-btn {
+  background-color: var(--ksp-gold-bg);
+  border: 1px solid var(--ksp-gold);
+  color: var(--ksp-gold-dark);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+}
+
+.ai-new-chat-btn:hover {
+  background-color: var(--ksp-gold);
+  color: #ffffff;
+}
+
+.ai-chat-main-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  background-color: #f1f5f9;
+}
+
+/* Premium Chat Bubbles Design */
+.ai-message {
+  display: flex;
+  gap: 12px;
+  max-width: 82%;
+  animation: chatMsgFadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+@keyframes chatMsgFadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ai-message.user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.ai-message.assistant {
+  align-self: flex-start;
+}
+
+.ai-msg-bubble {
+  padding: 14px 18px;
+  border-radius: 16px;
+  position: relative;
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  transition: box-shadow 0.2s ease;
+}
+
+.ai-message.user .ai-msg-bubble {
+  background: linear-gradient(135deg, var(--ksp-navy) 0%, #1e3a8a 100%);
+  color: #ffffff;
+  border-bottom-right-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ai-message.assistant .ai-msg-bubble {
+  background-color: #ffffff;
+  color: var(--text-primary);
+  border: 1px solid rgba(197, 160, 89, 0.2);
+  border-top-left-radius: 4px;
+  box-shadow: 0 4px 10px rgba(197, 160, 89, 0.08);
+}
+
+.ai-msg-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background-color: var(--ksp-navy);
+  border: 1.5px solid var(--ksp-gold);
+  color: var(--ksp-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+
+.ai-msg-avatar:hover {
+  transform: scale(1.08);
+}
+
+/* Polished Explainable AI Accordion & Timeline */
+.ai-evidence-accordion {
+  margin-top: 12px;
+  border: 1px solid rgba(197, 160, 89, 0.25);
+  border-radius: 12px;
+  background-color: #fcfbf9;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(197, 160, 89, 0.05);
+  transition: all 0.2s ease;
+}
+
+.ai-evidence-accordion[open] {
+  box-shadow: 0 4px 12px rgba(197, 160, 89, 0.1);
+  background-color: #ffffff;
+}
+
+.ai-evidence-header {
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ksp-gold-dark);
+  cursor: pointer;
+  background-color: rgba(197, 160, 89, 0.06);
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.ai-evidence-header:hover {
+  background-color: rgba(197, 160, 89, 0.12);
+}
+
+.ai-evidence-body {
+  padding: 14px;
+  border-top: 1px solid rgba(197, 160, 89, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ai-reasoning-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-section-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ksp-navy);
+  margin-bottom: 10px;
+}
+
+.ai-timeline {
+  border-left: 2px solid rgba(197, 160, 89, 0.25);
+  margin-left: 8px;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+}
+
+.ai-timeline-step {
+  font-size: 0.82rem;
+  color: #475569;
+  line-height: 1.4;
+  position: relative;
+}
+
+.ai-timeline-step .ai-step-bullet {
+  position: absolute;
+  left: -22px;
+  top: 1px;
+  width: 10px;
+  height: 10px;
+  background-color: #ffffff;
+  border: 2px solid var(--ksp-gold);
+  border-radius: 50%;
+  display: block;
+  z-index: 2;
+  color: transparent;
+  user-select: none;
+}
+
+.ai-timeline-step:last-child::after {
+  content: '';
+  position: absolute;
+  left: -22px;
+  top: 10px;
+  width: 12px;
+  height: 100%;
+  background-color: #ffffff; /* Cover the remaining left border */
+  z-index: 1;
+}
+
+/* SQL query box in Evidence trail */
+.ai-sql-container {
+  position: relative;
+  margin-top: 6px;
+}
+
+.ai-sql-block {
+  background-color: #0f172a;
+  border-left: 3px solid var(--ksp-gold);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 0;
+  color: #f1f5f9;
+  font-family: 'Fira Code', 'Courier New', Courier, monospace;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  overflow-x: auto;
+}
+
+.ai-copy-sql-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #cbd5e1;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ai-copy-sql-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-color: var(--ksp-gold);
+}
+
+.ai-copy-sql-btn.copied {
+  background-color: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
+}

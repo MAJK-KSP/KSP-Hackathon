@@ -185,6 +185,25 @@ async def chat_with_db(request: ChatRequest):
         
         start_time = time.time()
         
+        # Accumulators for streamed details
+        streamed_steps = [
+            "Started AI Database Agent session.",
+            "Analyzed user query and checked safety constraints."
+        ]
+        streamed_queries = []
+        
+        def process_queue_item(item):
+            """Accumulate unique streamed reasoning steps and SQL queries."""
+            if isinstance(item, dict):
+                if item.get("type") == "reasoning_step":
+                    content = item.get("content")
+                    if content and content not in streamed_steps:
+                        streamed_steps.append(content)
+                elif item.get("type") == "sql_query":
+                    content = item.get("content")
+                    if content and content not in streamed_queries:
+                        streamed_queries.append(content)
+
         # Stream first two static reasoning steps immediately
         yield json.dumps({"type": "reasoning_step", "content": "Started AI Database Agent session."}) + "\n"
         yield json.dumps({"type": "reasoning_step", "content": "Analyzed user query and checked safety constraints."}) + "\n"
@@ -194,6 +213,7 @@ async def chat_with_db(request: ChatRequest):
             try:
                 # Wait for queue updates or check task status
                 item = await asyncio.wait_for(queue.get(), timeout=0.1)
+                process_queue_item(item)
                 yield json.dumps(item) + "\n"
                 queue.task_done()
             except asyncio.TimeoutError:
@@ -206,6 +226,7 @@ async def chat_with_db(request: ChatRequest):
         while not queue.empty():
             try:
                 item = queue.get_nowait()
+                process_queue_item(item)
                 yield json.dumps(item) + "\n"
                 queue.task_done()
             except Exception:
@@ -219,12 +240,9 @@ async def chat_with_db(request: ChatRequest):
             result = await agent_task
             time_taken_ms = int((time.time() - start_time) * 1000)
             
-            # Retrieve final SQL queries and reasoning steps from result messages
-            sql_queries = []
-            reasoning_steps = [
-                "Started AI Database Agent session.",
-                "Analyzed user query and checked safety constraints."
-            ]
+            # Retrieve final SQL queries and reasoning steps from result messages, avoiding duplicates
+            sql_queries = list(streamed_queries)
+            reasoning_steps = list(streamed_steps)
             
             for msg in result.all_messages():
                 if hasattr(msg, 'parts'):
@@ -246,21 +264,33 @@ async def chat_with_db(request: ChatRequest):
                                     sql_query = args_data['sql']
                                 elif 'object' in args_data and isinstance(args_data['object'], dict) and 'sql' in args_data['object']:
                                     sql_query = args_data['object']['sql']
-                            if sql_query:
+                            if sql_query and sql_query not in sql_queries:
                                 sql_queries.append(sql_query)
-                                reasoning_steps.append(f"Formulated SQL query: {sql_query}")
-                                reasoning_steps.append("Dispatched query request to Supabase PostgreSQL database.")
+                                step1 = f"Formulated SQL query: {sql_query}"
+                                if step1 not in reasoning_steps:
+                                    reasoning_steps.append(step1)
+                                step2 = "Dispatched query request to Supabase PostgreSQL database."
+                                if step2 not in reasoning_steps:
+                                    reasoning_steps.append(step2)
                                 
                         elif part_type == 'ToolReturnPart' or part_type == 'ToolResultPart':
                             ret_content = str(getattr(part, 'content', ''))
                             if "Error" in ret_content or "unsafe" in ret_content.lower():
-                                reasoning_steps.append(f"Database query failed or was rejected: {ret_content[:100]}...")
+                                step = f"Database query failed or was rejected: {ret_content[:100]}..."
+                                if step not in reasoning_steps:
+                                    reasoning_steps.append(step)
                             else:
-                                reasoning_steps.append("Database query executed successfully. Retrieved records.")
+                                step = "Database query executed successfully. Retrieved records."
+                                if step not in reasoning_steps:
+                                    reasoning_steps.append(step)
                         elif part_type == 'RetryPromptPart':
-                            reasoning_steps.append("Validation warning triggered. Correcting query format and arguments.")
+                            step = "Validation warning triggered. Correcting query format and arguments."
+                            if step not in reasoning_steps:
+                                reasoning_steps.append(step)
             
-            reasoning_steps.append("Compiled final response and rendered markdown results table.")
+            final_step = "Compiled final response and rendered markdown results table."
+            if final_step not in reasoning_steps:
+                reasoning_steps.append(final_step)
             
             # Send final response structure
             yield json.dumps({
