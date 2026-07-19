@@ -1,0 +1,12 @@
+{
+  "appsail": [
+    {
+      "name": "NodeBackend",
+      "source": "."
+    },
+    {
+      "name": "PythonBackend",
+      "source": "backend/python"
+    }
+  ]
+}
