@@ -12,6 +12,17 @@ const ALGORITHM = 'aes-256-gcm';
 const FALLBACK_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 const ENCRYPTION_KEY = process.env.DB_ENCRYPTION_KEY || FALLBACK_KEY;
 
+const isProduction = process.env.NODE_ENV === 'production';
+export const SESSION_COOKIE_NAME = isProduction ? '__Host-session_id' : 'session_id';
+
+export const getCookieOptions = (maxAge?: number) => ({
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: isProduction ? ('strict' as const) : ('lax' as const),
+  path: '/',
+  ...(maxAge ? { maxAge } : {}),
+});
+
 export const encryptSecret = (text: string): string => {
   const key = Buffer.from(ENCRYPTION_KEY, 'hex');
   const iv = crypto.randomBytes(12);

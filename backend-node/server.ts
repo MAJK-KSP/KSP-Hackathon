@@ -21,6 +21,8 @@ import {
   encryptSecret,
   decryptSecret,
   logSecurityEvent,
+  SESSION_COOKIE_NAME,
+  getCookieOptions,
 } from './auth';
 import {
   authLimiter,
@@ -55,7 +57,7 @@ const publicPath = fs.existsSync(path.resolve(__dirname, '../dist/public'))
 
 // Page Routes (with Secure Redirects for React SPA)
 app.get(['/', '/dashboard', '/profile', '/security'], async (req, res) => {
-  const sessionId = req.cookies['__Host-session_id'];
+  const sessionId = req.cookies[SESSION_COOKIE_NAME];
   const isRoot = req.path === '/';
   
   if (sessionId) {
@@ -147,14 +149,8 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       req.ip || null
     );
 
-    // Set secure cookie using the Host-prefixed cookie and strict parameters
-    res.cookie('__Host-session_id', session.id, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-      path: '/',
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
-    });
+    // Set secure cookie using dynamic parameters
+    res.cookie(SESSION_COOKIE_NAME, session.id, getCookieOptions(24 * 60 * 60 * 1000));
 
     await logSecurityEvent(
       'login_success_no_mfa',
@@ -225,7 +221,7 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
 
     if (is_setup) {
       // MFA Setup verification: requires an active session
-      const sessionId = req.cookies['__Host-session_id'];
+      const sessionId = req.cookies[SESSION_COOKIE_NAME];
       if (!sessionId) {
         return res.status(401).json({ error: 'Unauthorized: Session required for MFA setup' });
       }
@@ -333,14 +329,8 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
       req.ip || null
     );
 
-    // Set cookie
-    res.cookie('__Host-session_id', session.id, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-      path: '/',
-      maxAge: 24 * 60 * 60 * 1000,
-    });
+    // Set cookie using dynamic parameters
+    res.cookie(SESSION_COOKIE_NAME, session.id, getCookieOptions(24 * 60 * 60 * 1000));
 
     return res.status(200).json({
       success: true,
@@ -360,7 +350,7 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
 // 5. Logout
 app.post('/api/auth/logout', authenticateSession, async (req: AuthenticatedRequest, res) => {
   try {
-    const sessionId = req.cookies['__Host-session_id'];
+    const sessionId = req.cookies[SESSION_COOKIE_NAME];
     if (sessionId) {
       await revokeSession(sessionId);
       await logSecurityEvent(
@@ -373,12 +363,7 @@ app.post('/api/auth/logout', authenticateSession, async (req: AuthenticatedReque
       );
     }
 
-    res.clearCookie('__Host-session_id', {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-      path: '/',
-    });
+    res.clearCookie(SESSION_COOKIE_NAME, getCookieOptions());
 
     return res.status(200).json({ success: true, message: 'Logged out successfully' });
   } catch (error) {

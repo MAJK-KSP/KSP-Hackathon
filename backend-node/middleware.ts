@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
-import { validateSession, User } from './auth';
+import { validateSession, User, SESSION_COOKIE_NAME, getCookieOptions } from './auth';
 
 // Custom interface to extend Express Request with the validated user
 export interface AuthenticatedRequest extends Request {
@@ -61,7 +61,7 @@ export const authenticateSession = async (
   res: Response,
   next: NextFunction
 ) => {
-  const sessionId = req.cookies['__Host-session_id'];
+  const sessionId = req.cookies[SESSION_COOKIE_NAME];
 
   if (!sessionId) {
     return res.status(401).json({ error: 'Unauthorized: No session token provided' });
@@ -72,12 +72,7 @@ export const authenticateSession = async (
 
     if (!user) {
       // Clear invalid cookie using same parameters as set
-      res.clearCookie('__Host-session_id', {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'strict',
-        path: '/',
-      });
+      res.clearCookie(SESSION_COOKIE_NAME, getCookieOptions());
       return res.status(401).json({ error: 'Unauthorized: Session has expired or is invalid' });
     }
 
