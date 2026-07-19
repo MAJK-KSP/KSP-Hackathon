@@ -1,6 +1,6 @@
 /**
  * @file seed.ts
- * @description Database seeding script. Used to initialize the SQLite database and create a default admin user.
+ * @description Database seeding script. Used to initialize the PostgreSQL database and create a default admin user.
  * Part of the Node.js backend.
  */
 

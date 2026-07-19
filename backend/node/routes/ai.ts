@@ -176,10 +176,10 @@ aiRouter.post('/chat', async (req: RoleAwareRequest, res: Response) => {
         [aiMessageId, activeConversationId, finalResponse, metadata, aiTimestamp]
       );
     } catch (dbErr) {
-      console.error('Failed to store AI response in SQLite:', dbErr);
+      console.error('Failed to store AI response in database:', dbErr);
     }
 
-    // Save logs to SQLite for law enforcement accountability
+    // Save logs to PostgreSQL/Supabase for law enforcement accountability
     try {
       const hmacSecret = process.env.HMAC_SECRET || 'ksp-secure-ai-token-secret-key-1029';
       const hmac = crypto.createHmac('sha256', hmacSecret);

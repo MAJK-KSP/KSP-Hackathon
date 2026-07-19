@@ -611,10 +611,10 @@ export const Dashboard: React.FC = () => {
 
               <div className="diagnostics-cards-grid-premium">
                 
-                {/* 1. SQLite Auth Database */}
+                {/* 1. PostgreSQL Auth Database */}
                 <div className={`diag-card-premium ${systemStatus?.sqlite_db?.connected ? 'connected' : 'disconnected'}`}>
                   <div className="diag-header">
-                    <span className="diag-label">Authentication DB (SQLite)</span>
+                    <span className="diag-label">Authentication DB (PostgreSQL/Supabase)</span>
                     <span className={`diag-status-light ${systemStatus?.sqlite_db?.connected ? 'green' : 'red'}`}></span>
                   </div>
                   <div className="diag-body-premium">
@@ -676,7 +676,7 @@ export const Dashboard: React.FC = () => {
                 <span className="console-title">System Telemetry Log Terminal</span>
                 <div className="console-rows">
                   <span className="console-row info">[INFO] {new Date().toISOString()} - Initializing Diagnostics protocol...</span>
-                  <span className="console-row success">[OK] SQLite connection verified successfully.</span>
+                  <span className="console-row success">[OK] PostgreSQL connection verified successfully.</span>
                   {systemStatus?.fastapi_backend?.connected ? (
                     <>
                       <span className="console-row success">[OK] FastAPI server response received in 18ms.</span>
