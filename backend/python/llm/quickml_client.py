@@ -29,7 +29,8 @@ async def get_zoho_token() -> str:
 
     if settings.zoho_refresh_token and settings.zoho_client_id and settings.zoho_client_secret:
         try:
-            async with httpx.AsyncClient() as client:
+            # Bypass SSL verification under development cert environments
+            async with httpx.AsyncClient(verify=False) as client:
                 resp = await client.post(
                     "https://accounts.zoho.in/oauth/v2/token",
                     data={

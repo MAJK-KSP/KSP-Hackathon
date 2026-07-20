@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from routes.briefing import router as briefing_router
+from routes.transcribe import router as transcribe_router
 from services.db import init_db
 
 
@@ -61,6 +62,7 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 
 app.include_router(briefing_router)
+app.include_router(transcribe_router)
 
 
 # ---------------------------------------------------------------------------

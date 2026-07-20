@@ -623,6 +623,62 @@ aiRouter.post('/datasets', requireAdmin, async (req: RoleAwareRequest, res: Resp
 });
 
 // ============================================================================
+// VOICE TRANSCRIPTION ENDPOINT
+// ============================================================================
+
+/**
+ * POST /api/ai/transcribe
+ * Transcribe recorded audio using Zoho Zia via Python backend proxy
+ */
+aiRouter.post('/transcribe', async (req: RoleAwareRequest, res: Response) => {
+  try {
+    const { audio, language } = req.body;
+    if (!audio) {
+      return res.status(400).json({ error: 'Audio payload is required' });
+    }
+
+    const pythonTranscribeUrl = getPythonUrl('/transcribe');
+    console.log(`[Node Proxy] Forwarding transcription request to: ${pythonTranscribeUrl}`);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 seconds timeout
+
+    try {
+      const response = await fetch(pythonTranscribeUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(req.body),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[Node Proxy] Python transcription backend responded with status: ${response.status}. Error: ${errorText}`);
+        return res.status(response.status).json({ error: `Python backend transcription error: ${errorText}` });
+      }
+
+      const data = await response.json();
+      console.log(`[Node Proxy] Transcription request succeeded. Success status: ${data.success}`);
+      return res.status(200).json(data);
+    } catch (fetchErr: any) {
+      clearTimeout(timeoutId);
+      if (fetchErr.name === 'AbortError') {
+        console.error('[Node Proxy] Transcription proxy request timed out after 15 seconds.');
+        return res.status(504).json({ error: 'Transcription request timed out.' });
+      }
+      throw fetchErr;
+    }
+  } catch (error: any) {
+    console.error('Error proxying transcription request:', error);
+    return res.status(500).json({ error: `Internal server error during transcription: ${error.message}` });
+  }
+});
+
+// ============================================================================
 // USER ROLE ENDPOINT (for frontend to check current user's role)
 // ============================================================================
 

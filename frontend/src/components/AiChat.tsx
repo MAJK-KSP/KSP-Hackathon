@@ -49,7 +49,7 @@ const CopySqlButton: React.FC<CopySqlButtonProps> = ({ text, label }) => {
 };
 
 export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
-  const { t } = useLanguage();
+  const { locale, t } = useLanguage();
   const [isOpen, setIsOpen] = useState(isFullPage);
   const [showHistory, setShowHistory] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -60,6 +60,319 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Voice recording and translation states
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [transcribing, setTranscribing] = useState(false);
+  const [speechLanguage, setSpeechLanguage] = useState<'en' | 'hi' | 'kn'>('en');
+  const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync speechLanguage with user's selected locale
+  useEffect(() => {
+    if (locale === 'kn') {
+      setSpeechLanguage('kn');
+    } else {
+      setSpeechLanguage('en');
+    }
+  }, [locale]);
+
+  // Clean up recording timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  const formatDuration = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  const startRecording = async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+      alert(t('Audio recording is not supported in this browser or context (requires HTTPS/localhost).'));
+      return;
+    }
+
+    setTranscriptionError(null);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop());
+        const mimeType = mediaRecorder.mimeType || 'audio/wav';
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        if (audioChunksRef.current.length > 0 && audioBlob.size > 0) {
+          await transcribeAudio(audioBlob);
+        }
+      };
+
+      mediaRecorder.start(250);
+      setIsRecording(true);
+      setRecordingDuration(0);
+
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(() => {
+        setRecordingDuration(prev => {
+          if (prev >= 30) {
+            stopRecording();
+            return 30;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+
+    } catch (err) {
+      console.error('Error starting audio recording:', err);
+      alert(t('Could not access microphone. Please check permissions.'));
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsRecording(false);
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      audioChunksRef.current = [];
+      mediaRecorderRef.current.stop();
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsRecording(false);
+    setRecordingDuration(0);
+    setTranscriptionError(null);
+  };
+
+  const transcribeAudio = async (blob: Blob) => {
+    setTranscribing(true);
+    setTranscriptionError(null);
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = async () => {
+        if (typeof reader.result !== 'string') {
+          setTranscribing(false);
+          setTranscriptionError(t('Failed to read recorded audio data.'));
+          return;
+        }
+        const base64data = reader.result.split(',')[1];
+        if (!base64data) {
+          setTranscribing(false);
+          setTranscriptionError(t('Recorded audio payload is empty.'));
+          return;
+        }
+        try {
+          const res = await fetch('/api/ai/transcribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              audio: base64data,
+              language: speechLanguage,
+              mimeType: blob.type
+            })
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.text) {
+              setInput(prev => {
+                const base = prev.trim();
+                return base ? `${base} ${data.text}` : data.text;
+              });
+            } else {
+              console.error('Transcription error:', data.error);
+              const errMsg = data.error ? t(data.error) : t('Speech not recognized. Please speak clearly.');
+              setTranscriptionError(errMsg);
+              setTimeout(() => setTranscriptionError(prev => prev === errMsg ? null : prev), 6000);
+            }
+          } else {
+            console.error('Transcription API responded with status:', res.status);
+            let errMsg = t('Transcription failed (HTTP {status})').replace('{status}', res.status.toString());
+            try {
+              const errData = await res.json();
+              if (errData.error) errMsg = t(errData.error);
+            } catch (e) {}
+            setTranscriptionError(errMsg);
+            setTimeout(() => setTranscriptionError(prev => prev === errMsg ? null : prev), 6000);
+          }
+        } catch (fetchErr) {
+          console.error('Error in transcribing audio request:', fetchErr);
+          const errMsg = t('Network error. Failed to reach transcription service.');
+          setTranscriptionError(errMsg);
+          setTimeout(() => setTranscriptionError(prev => prev === errMsg ? null : prev), 6000);
+        } finally {
+          setTranscribing(false);
+        }
+      };
+    } catch (err) {
+      console.error('Failed to read audio blob:', err);
+      setTranscriptionError(t('Failed to process recorded audio.'));
+      setTranscribing(false);
+    }
+  };
+
+  const renderInputArea = () => {
+    return (
+      <div className="ai-chat-input-area" style={{ position: 'relative' }}>
+        {/* Transcription feedback / error banner */}
+        {transcriptionError && (
+          <div className="ai-transcription-error-banner" style={{
+            position: 'absolute',
+            bottom: '100%',
+            left: '12px',
+            right: '12px',
+            backgroundColor: '#fee2e2',
+            border: '1px solid #fca5a5',
+            color: '#991b1b',
+            padding: '8px 12px',
+            borderRadius: '8px',
+            fontSize: '0.825rem',
+            marginBottom: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            zIndex: 10,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>⚠️</span>
+              <strong>{transcriptionError}</strong>
+            </span>
+            <button 
+              onClick={() => setTranscriptionError(null)} 
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#991b1b',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                padding: '0 4px',
+                fontSize: '1rem',
+                lineHeight: 1
+              }}
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {isRecording ? (
+          <div className="ai-recording-panel">
+            <div className="ai-recording-status">
+              <span className="ai-recording-dot"></span>
+              <span className="ai-recording-timer">{t('Recording...')} {formatDuration(recordingDuration)} / 0:30</span>
+            </div>
+            <div className="ai-recording-waves">
+              <span className="wave-bar"></span>
+              <span className="wave-bar"></span>
+              <span className="wave-bar"></span>
+              <span className="wave-bar"></span>
+              <span className="wave-bar"></span>
+            </div>
+            <div className="ai-recording-actions">
+              <button className="ai-cancel-btn" onClick={cancelRecording} title={t('Cancel')}>
+                {t('Cancel')}
+              </button>
+              <button className="ai-stop-btn" onClick={stopRecording} title={t('Stop & Transcribe')}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="12" height="12">
+                  <rect x="4" y="4" width="16" height="16" rx="2" />
+                </svg>
+                {t('Stop')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <textarea
+              ref={inputRef}
+              className="ai-chat-input"
+              placeholder={t('Ask the KSP AI Assistant...')}
+              value={input}
+              onChange={e => {
+                setInput(e.target.value);
+                if (transcriptionError) setTranscriptionError(null);
+              }}
+              onKeyDown={handleKeyDown}
+              rows={1}
+              disabled={loading || transcribing}
+            />
+            
+            {/* Language Selector Dropdown */}
+            <select
+              className="ai-voice-lang-select"
+              value={speechLanguage}
+              onChange={e => setSpeechLanguage(e.target.value as any)}
+              title={t('Select Speech Language')}
+              disabled={loading || transcribing}
+            >
+              <option value="en">🌐 EN</option>
+              <option value="hi">🌐 HI</option>
+              <option value="kn">🌐 KN</option>
+            </select>
+
+            {/* Microphone Button */}
+            <button
+              className={`ai-voice-btn ${isRecording ? 'recording' : ''} ${transcribing ? 'transcribing' : ''}`}
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={loading || transcribing}
+              title={isRecording ? t('Stop Recording') : t('Record Voice')}
+              type="button"
+            >
+              {transcribing ? (
+                <div className="ai-voice-loader" />
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                  <line x1="12" y1="19" x2="12" y2="23"></line>
+                  <line x1="8" y1="23" x2="16" y2="23"></line>
+                </svg>
+              )}
+            </button>
+
+            <button
+              className="ai-send-btn"
+              onClick={sendMessage}
+              disabled={!input.trim() || loading || transcribing}
+              title={t('Send Message')}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
 
   // Synchronize isOpen state and auto-fetch conversations list for full-page mode
   useEffect(() => {
@@ -691,29 +1004,7 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
                 </div>
 
                 {/* Input Area */}
-                <div className="ai-chat-input-area">
-                  <textarea
-                    ref={inputRef}
-                    className="ai-chat-input"
-                    placeholder={t('Ask the KSP AI Assistant...')}
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    rows={1}
-                    disabled={loading}
-                  />
-                  <button
-                    className="ai-send-btn"
-                    onClick={sendMessage}
-                    disabled={!input.trim() || loading}
-                    title={t('Send Message')}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="22" y1="2" x2="11" y2="13"></line>
-                      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                    </svg>
-                  </button>
-                </div>
+                {renderInputArea()}
               </div>
             </div>
           ) : (
@@ -934,29 +1225,7 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
                 <div ref={messagesEndRef} />
               </div>
 
-              <div className="ai-chat-input-area">
-                <textarea
-                  ref={inputRef}
-                  className="ai-chat-input"
-                  placeholder={t('Ask the KSP AI Assistant...')}
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  rows={1}
-                  disabled={loading}
-                />
-                <button
-                  className="ai-send-btn"
-                  onClick={sendMessage}
-                  disabled={!input.trim() || loading}
-                  title={t('Send Message')}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                  </svg>
-                </button>
-              </div>
+              {renderInputArea()}
             </>
           )}
         </div>
