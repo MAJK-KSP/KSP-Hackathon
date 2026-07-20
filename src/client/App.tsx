@@ -7,6 +7,7 @@ import { Dashboard } from './components/Dashboard';
 import { Profile } from './components/Profile';
 import { Security } from './components/Security';
 import { AiChat } from './components/AiChat';
+import { GisMap } from './components/GisMap';
 
 interface User {
   id: string;
@@ -93,6 +94,7 @@ const AppContent: React.FC = () => {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/security" element={<Security user={user} onMfaEnabled={checkSession} />} />
+        <Route path="/map" element={<GisMap />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
       <AiChat />

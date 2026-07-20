@@ -4,7 +4,8 @@ import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import { z } from 'zod';
-import { initDb, getRow, runQuery } from './db';
+import postgres from 'postgres';
+import { initDb, getRow, runQuery, getAllRows } from './db';
 import {
   hashPassword,
   verifyPassword,
@@ -368,6 +369,232 @@ app.post('/api/profile', authenticateSession, async (req: AuthenticatedRequest, 
   } catch (error) {
     console.error('Error updating profile:', error);
     return res.status(500).json({ error: 'Internal server error updating profile' });
+  }
+});
+
+// Lazy Remote Supabase Postgres client
+let pgSql: any = null;
+const getPgClient = () => {
+  if (!pgSql && process.env.DB_HOST && process.env.DB_PASSWORD) {
+    try {
+      pgSql = postgres({
+        host: process.env.DB_HOST,
+        port: parseInt(process.env.DB_PORT || '6543', 10),
+        database: process.env.DB_NAME || 'postgres',
+        username: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD,
+        ssl: 'require',
+        connect_timeout: 3, // 3 seconds timeout
+      });
+    } catch (err) {
+      console.warn('Failed to initialize Postgres client:', err);
+    }
+  }
+  return pgSql;
+};
+
+// Station coordinates for spatial jittering of cases/incidents
+const stationCoordinates: Record<string, [number, number]> = {
+  'Koramangala Police Station': [12.9352, 77.6244],
+  'Indiranagar Police Station': [12.9719, 77.6412],
+  'Whitefield Police Station': [12.9698, 77.7499],
+  'Jayanagar Police Station': [12.9250, 77.5897],
+  'Ulsoor Police Station': [12.9817, 77.6286],
+  'Malleshwaram Police Station': [13.0031, 77.5696],
+  'Cubbon Park Police Station': [12.9779, 77.5952],
+};
+
+const getJitteredCoords = (stationName: string) => {
+  let baseCoords = [12.9716, 77.5946]; // Default: Bengaluru center
+  if (stationName) {
+    const matched = Object.entries(stationCoordinates).find(([key]) =>
+      stationName.toLowerCase().includes(key.toLowerCase().split(' ')[0])
+    );
+    if (matched) {
+      baseCoords = matched[1];
+    }
+  }
+  // Add jitter: ~100 to 400 meters offset
+  const jitterLat = (Math.random() - 0.5) * 0.007;
+  const jitterLng = (Math.random() - 0.5) * 0.007;
+  return {
+    latitude: baseCoords[0] + jitterLat,
+    longitude: baseCoords[1] + jitterLng,
+  };
+};
+
+// 9. Get Cases list (Tries remote Supabase first, falls back to local SQLite)
+app.get('/api/cases', authenticateSession, async (req: AuthenticatedRequest, res) => {
+  const client = getPgClient();
+  if (client) {
+    try {
+      console.log('Attempting to fetch cases from remote Supabase Postgres...');
+      
+      // 1. Fetch casemaster (Historical Database)
+      let remoteCases: any[] = [];
+      try {
+        const rows = await client`
+          SELECT 
+            c.casemasterid, 
+            c.crimeno, 
+            c.caseno, 
+            c.latitude, 
+            c.longitude, 
+            c.landmark, 
+            c.brieffacts, 
+            c.crimeregistereddate, 
+            ch.crimegroupname as crime_type,
+            u.unitname as police_station,
+            cs.casestatusname as status
+          FROM public.casemaster c
+          LEFT JOIN public.crimehead ch ON c.crimemajorheadid = ch.crimeheadid
+          LEFT JOIN public.unit u ON c.policestationid = u.unitid
+          LEFT JOIN public.casestatusmaster cs ON c.casestatusid = cs.casestatusid
+          WHERE c.latitude IS NOT NULL AND c.longitude IS NOT NULL
+          LIMIT 300
+        `;
+        remoteCases = rows.map((r: any) => ({
+          id: `casemaster_${r.casemasterid}`,
+          case_number: r.crimeno || r.caseno || `FIR-REM-${r.casemasterid}`,
+          crime_type: r.crime_type || 'Uncategorized',
+          jurisdiction: 'Bengaluru City Police',
+          police_station: r.police_station || 'Unknown Station',
+          landmark: r.landmark || 'Resolved Location',
+          latitude: parseFloat(r.latitude),
+          longitude: parseFloat(r.longitude),
+          reported_date: r.crimeregistereddate ? new Date(r.crimeregistereddate).toISOString().split('T')[0] : '2026-07-01',
+          status: r.status || 'Active',
+          dataset: 'casemaster',
+          details: r.brieffacts || ''
+        }));
+      } catch (err: any) {
+        console.error('Failed to fetch casemaster rows:', err.message || err);
+      }
+
+      // 2. Fetch active cases (Ongoing briefing cases)
+      let activeCasesList: any[] = [];
+      try {
+        const rows = await client`
+          SELECT station_name, briefing_date, cr_number, fir_number, type, accused, status, next_hearing, priority, remarks 
+          FROM public.active_cases 
+          LIMIT 100
+        `;
+        activeCasesList = rows.map((r: any, idx: number) => {
+          const { latitude, longitude } = getJitteredCoords(r.station_name);
+          return {
+            id: `active_${r.fir_number || idx}`,
+            case_number: r.fir_number || r.cr_number || `ACT-${idx}`,
+            crime_type: r.type || 'Active Case',
+            jurisdiction: 'Bengaluru City Police',
+            police_station: r.station_name || 'Koramangala Police Station',
+            landmark: r.remarks || 'Briefing Record',
+            latitude,
+            longitude,
+            reported_date: r.briefing_date ? new Date(r.briefing_date).toISOString().split('T')[0] : '2026-07-11',
+            status: r.status || 'Active',
+            dataset: 'active_cases',
+            details: `Cr Number: ${r.cr_number || 'N/A'}\nAccused: ${r.accused || 'Unknown'}\nPriority: ${r.priority || 'Normal'}\nNext Hearing: ${r.next_hearing || 'N/A'}\nRemarks: ${r.remarks || ''}`
+          };
+        });
+      } catch (err: any) {
+        console.error('Failed to fetch active_cases rows:', err.message || err);
+      }
+
+      // 3. Fetch overnight incidents (Recent 24h incidents)
+      let overnightIncidentsList: any[] = [];
+      try {
+        const rows = await client`
+          SELECT station_name, briefing_date, fir_number, time, type, location, description, severity, status, investigating_officer 
+          FROM public.overnight_incidents 
+          LIMIT 100
+        `;
+        overnightIncidentsList = rows.map((r: any, idx: number) => {
+          const { latitude, longitude } = getJitteredCoords(r.station_name);
+          return {
+            id: `overnight_${r.fir_number || idx}`,
+            case_number: r.fir_number || `OVR-${idx}`,
+            crime_type: r.type || 'Overnight Incident',
+            jurisdiction: 'Bengaluru City Police',
+            police_station: r.station_name || 'Koramangala Police Station',
+            landmark: r.location || 'Incident Location',
+            latitude,
+            longitude,
+            reported_date: r.briefing_date ? new Date(r.briefing_date).toISOString().split('T')[0] : '2026-07-11',
+            status: r.status || 'Active',
+            dataset: 'overnight_incidents',
+            details: `Time: ${r.time || 'N/A'}\nSeverity: ${r.severity || 'Normal'}\nOfficer: ${r.investigating_officer || 'Unknown'}\nDescription: ${r.description || ''}`
+          };
+        });
+      } catch (err: any) {
+        console.error('Failed to fetch overnight_incidents rows:', err.message || err);
+      }
+
+      // 4. Fetch repeat offenders
+      let repeatOffendersList: any[] = [];
+      try {
+        const rows = await client`
+          SELECT station_name, briefing_date, name, alias, age, address, risk_level, total_cases, last_seen, remarks 
+          FROM public.repeat_offenders 
+          LIMIT 100
+        `;
+        repeatOffendersList = rows.map((r: any, idx: number) => {
+          const { latitude, longitude } = getJitteredCoords(r.station_name);
+          return {
+            id: `offender_${r.name || idx}`,
+            case_number: r.name || `Offender-${idx}`,
+            crime_type: 'Repeat Offender',
+            jurisdiction: 'Bengaluru City Police',
+            police_station: r.station_name || 'Koramangala Police Station',
+            landmark: r.address || 'Last Known Address',
+            latitude,
+            longitude,
+            reported_date: r.briefing_date ? new Date(r.briefing_date).toISOString().split('T')[0] : '2026-07-11',
+            status: r.risk_level || 'High Risk',
+            dataset: 'repeat_offenders',
+            details: `Alias: ${r.alias || 'N/A'}\nAge: ${r.age || 'N/A'}\nTotal Cases: ${r.total_cases || '0'}\nLast Seen: ${r.last_seen || 'N/A'}\nRemarks: ${r.remarks || ''}`
+          };
+        });
+      } catch (err: any) {
+        console.error('Failed to fetch repeat_offenders rows:', err.message || err);
+      }
+
+      // Combine all results
+      const allItems = [
+        ...remoteCases,
+        ...activeCasesList,
+        ...overnightIncidentsList,
+        ...repeatOffendersList
+      ];
+
+      if (allItems.length > 0) {
+        return res.status(200).json({
+          success: true,
+          source: 'remote',
+          cases: allItems
+        });
+      }
+    } catch (err: any) {
+      console.warn('Remote database connection failed, falling back to local SQLite:', err.message || err);
+    }
+  }
+
+  // Fallback to local SQLite cases
+  try {
+    console.log('Fetching cases from local SQLite fallback...');
+    const localCases = await getAllRows('SELECT * FROM cases');
+    const mappedLocal = localCases.map((c: any) => ({
+      ...c,
+      dataset: 'casemaster',
+      details: c.landmark || ''
+    }));
+    return res.status(200).json({
+      success: true,
+      source: 'local_fallback',
+      cases: mappedLocal
+    });
+  } catch (err) {
+    console.error('Failed to fetch local cases:', err);
+    return res.status(500).json({ error: 'Internal server error fetching cases' });
   }
 });
 

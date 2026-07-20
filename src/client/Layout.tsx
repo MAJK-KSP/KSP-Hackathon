@@ -29,6 +29,8 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
         return t("Officer Profile");
       case '/security':
         return t("MFA Security");
+      case '/map':
+        return t("GIS Command Map");
       default:
         return t("Overview");
     }
@@ -88,6 +90,15 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
               </svg>
               <span>{t("MFA Security")}</span>
+            </NavLink>
+
+            <NavLink to="/map" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon>
+                <line x1="9" y1="3" x2="9" y2="18"></line>
+                <line x1="15" y1="6" x2="15" y2="21"></line>
+              </svg>
+              <span>{t("GIS Command Map")}</span>
             </NavLink>
 
             <a href="#" className="nav-item" onClick={(e) => { e.preventDefault(); document.getElementById('ai-chat-toggle')?.click(); }}>

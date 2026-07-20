@@ -1,0 +1,620 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useLanguage } from '../LanguageContext';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Leaflet default icon fix for Vite/Webpack bundling issues
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
+
+interface Case {
+  id: string;
+  case_number: string;
+  crime_type: string;
+  jurisdiction: string;
+  police_station: string;
+  landmark: string;
+  latitude: number;
+  longitude: number;
+  reported_date: string;
+  status: string;
+  dataset?: string;
+  details?: string;
+}
+
+export const GisMap: React.FC = () => {
+  const { t, locale } = useLanguage();
+  const [cases, setCases] = useState<Case[]>([]);
+  const [filteredCases, setFilteredCases] = useState<Case[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dataSource, setDataSource] = useState<'remote' | 'local_fallback' | null>(null);
+  const [noResults, setNoResults] = useState(false);
+
+  // Draft/temporary filter state (user fills these in; only applied on Search click)
+  const [draftSearch, setDraftSearch] = useState('');
+  const [draftType, setDraftType] = useState('');
+  const [draftStation, setDraftStation] = useState('');
+  const [draftStatus, setDraftStatus] = useState('');
+  const [draftStartDate, setDraftStartDate] = useState('');
+  const [draftEndDate, setDraftEndDate] = useState('');
+
+  // Active (committed) filter state — drives the actual rendering
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedType, setSelectedType] = useState('');
+  const [selectedStation, setSelectedStation] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  // Map Toggles
+  const [viewMode, setViewMode] = useState<'markers' | 'heatmap'>('markers');
+
+  // Leaflet refs
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const canvasLayerRef = useRef<L.Layer | null>(null);
+
+  // Load cases from API
+  useEffect(() => {
+    const fetchCases = async () => {
+      try {
+        const res = await fetch('/api/cases');
+        if (res.ok) {
+          const data = await res.json();
+          setCases(data.cases || []);
+          setFilteredCases(data.cases || []);
+          setDataSource(data.source);
+        }
+      } catch (err) {
+        console.error('Failed to load cases:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCases();
+  }, []);
+
+  // Initialize Leaflet Map
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    const map = L.map(mapContainerRef.current, {
+      center: [12.9716, 77.5946],
+      zoom: 12,
+      minZoom: 4,
+      zoomControl: false,
+    });
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 20,
+    }).addTo(map);
+
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    mapRef.current = map;
+    markersLayerRef.current = L.layerGroup().addTo(map);
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
+
+  // Dynamic dropdown options derived from all loaded cases
+  const uniqueCrimeTypes = [...new Set(cases.map(c => c.crime_type).filter(Boolean))].sort();
+  const uniqueStations = [...new Set(cases.map(c => c.police_station).filter(Boolean))].sort();
+
+  // Apply filters to produce filteredCases
+  const applyFilters = useCallback(() => {
+    let result = cases;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(c =>
+        c.case_number.toLowerCase().includes(q) ||
+        c.landmark.toLowerCase().includes(q) ||
+        c.crime_type.toLowerCase().includes(q) ||
+        c.police_station.toLowerCase().includes(q) ||
+        (c.details || '').toLowerCase().includes(q) ||
+        c.id.toLowerCase().includes(q)
+      );
+    }
+
+    if (selectedType) {
+      result = result.filter(c => c.crime_type === selectedType);
+    }
+
+    if (selectedStation) {
+      result = result.filter(c => c.police_station === selectedStation);
+    }
+
+    if (selectedStatus) {
+      result = result.filter(c => c.status === selectedStatus);
+    }
+
+    if (startDate) {
+      result = result.filter(c => c.reported_date >= startDate);
+    }
+
+    if (endDate) {
+      result = result.filter(c => c.reported_date <= endDate);
+    }
+
+    return result;
+  }, [cases, searchQuery, selectedType, selectedStation, selectedStatus, startDate, endDate]);
+
+  // Re-filter whenever committed filter state changes
+  useEffect(() => {
+    const result = applyFilters();
+    setFilteredCases(result);
+    setNoResults(result.length === 0 && cases.length > 0);
+  }, [applyFilters, cases.length]);
+
+  // Search button handler: commit draft state and fly to results
+  const handleSearch = () => {
+    // Commit draft values to active filter state
+    setSearchQuery(draftSearch);
+    setSelectedType(draftType);
+    setSelectedStation(draftStation);
+    setSelectedStatus(draftStatus);
+    setStartDate(draftStartDate);
+    setEndDate(draftEndDate);
+
+    // We need to compute the results using the draft values directly
+    // (since setState is async and won't be reflected yet)
+    let result = cases;
+
+    if (draftSearch.trim()) {
+      const q = draftSearch.toLowerCase();
+      result = result.filter(c =>
+        c.case_number.toLowerCase().includes(q) ||
+        c.landmark.toLowerCase().includes(q) ||
+        c.crime_type.toLowerCase().includes(q) ||
+        c.police_station.toLowerCase().includes(q) ||
+        (c.details || '').toLowerCase().includes(q) ||
+        c.id.toLowerCase().includes(q)
+      );
+    }
+    if (draftType) result = result.filter(c => c.crime_type === draftType);
+    if (draftStation) result = result.filter(c => c.police_station === draftStation);
+    if (draftStatus) result = result.filter(c => c.status === draftStatus);
+    if (draftStartDate) result = result.filter(c => c.reported_date >= draftStartDate);
+    if (draftEndDate) result = result.filter(c => c.reported_date <= draftEndDate);
+
+    setFilteredCases(result);
+    setNoResults(result.length === 0 && cases.length > 0);
+
+    // Map redirection logic
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (result.length === 0) {
+      // No results — reset to default Bengaluru view
+      map.flyTo([12.9716, 77.5946], 12, { duration: 1.2 });
+    } else if (result.length === 1) {
+      // Single match — fly directly to it and open its popup
+      const c = result[0];
+      map.flyTo([c.latitude, c.longitude], 16, { duration: 1.5 });
+
+      // After flyTo animation completes, open the popup
+      setTimeout(() => {
+        const markersLayer = markersLayerRef.current;
+        if (markersLayer) {
+          markersLayer.eachLayer((layer: any) => {
+            if (layer.getLatLng) {
+              const latlng = layer.getLatLng();
+              const dist = Math.abs(latlng.lat - c.latitude) + Math.abs(latlng.lng - c.longitude);
+              if (dist < 0.0005) {
+                layer.openPopup();
+              }
+            }
+          });
+        }
+      }, 1600);
+    } else {
+      // Multiple matches — fit bounds to show all
+      const bounds = L.latLngBounds(result.map(c => [c.latitude, c.longitude] as [number, number]));
+      map.flyToBounds(bounds, { padding: [50, 50], duration: 1.2 });
+    }
+  };
+
+  // Reset all filters
+  const handleReset = () => {
+    setDraftSearch('');
+    setDraftType('');
+    setDraftStation('');
+    setDraftStatus('');
+    setDraftStartDate('');
+    setDraftEndDate('');
+    setSearchQuery('');
+    setSelectedType('');
+    setSelectedStation('');
+    setSelectedStatus('');
+    setStartDate('');
+    setEndDate('');
+    setNoResults(false);
+
+    const map = mapRef.current;
+    if (map) {
+      map.flyTo([12.9716, 77.5946], 12, { duration: 1.2 });
+    }
+  };
+
+  // Map Render (Markers or Heatmap)
+  useEffect(() => {
+    const map = mapRef.current;
+    const markersLayer = markersLayerRef.current;
+    if (!map || !markersLayer) return;
+
+    // Clear existing markers/layers
+    markersLayer.clearLayers();
+    if (canvasLayerRef.current) {
+      map.removeLayer(canvasLayerRef.current);
+      canvasLayerRef.current = null;
+    }
+
+    if (filteredCases.length === 0) return;
+
+    if (viewMode === 'markers') {
+      const drawMarkers = () => {
+        markersLayer.clearLayers();
+        const zoom = map.getZoom();
+        
+        // Simple pixel-distance clustering
+        const clusters: { latitude: number; longitude: number; cases: Case[] }[] = [];
+        const distanceThreshold = zoom > 14 ? 15 : zoom > 12 ? 35 : 55;
+
+        filteredCases.forEach(c => {
+          let added = false;
+          const pt = map.latLngToContainerPoint([c.latitude, c.longitude]);
+
+          for (let i = 0; i < clusters.length; i++) {
+            const cluster = clusters[i];
+            const cpt = map.latLngToContainerPoint([cluster.latitude, cluster.longitude]);
+            const dx = pt.x - cpt.x;
+            const dy = pt.y - cpt.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < distanceThreshold) {
+              cluster.cases.push(c);
+              cluster.latitude = (cluster.latitude * (cluster.cases.length - 1) + c.latitude) / cluster.cases.length;
+              cluster.longitude = (cluster.longitude * (cluster.cases.length - 1) + c.longitude) / cluster.cases.length;
+              added = true;
+              break;
+            }
+          }
+
+          if (!added) {
+            clusters.push({
+              latitude: c.latitude,
+              longitude: c.longitude,
+              cases: [c]
+            });
+          }
+        });
+
+        // Add markers/clusters to Leaflet layer
+        clusters.forEach(cluster => {
+          if (cluster.cases.length === 1) {
+            const c = cluster.cases[0];
+            const colorClass = c.status === 'Active' ? 'red' : c.status === 'Closed' ? 'green' : 'orange';
+            
+            const customIcon = L.divIcon({
+              className: 'custom-leaflet-marker-wrapper',
+              html: `<div class="marker-dot status-${colorClass}"></div>`,
+              iconSize: [20, 20],
+              iconAnchor: [10, 10],
+            });
+
+            const marker = L.marker([c.latitude, c.longitude], { icon: customIcon });
+            
+            const statusLabel = c.status === 'Closed' ? t("Solved Cases") : c.status === 'Active' ? t("Active Cases") : t("Unsolved Cases");
+            const popupHtml = `
+              <div class="map-popup-card">
+                <div class="popup-header">
+                  <span class="popup-badge status-${colorClass}">${statusLabel}</span>
+                  <span class="popup-case-id">${c.case_number}</span>
+                </div>
+                <div class="popup-body">
+                  <h4 class="popup-title">${t(c.crime_type)}</h4>
+                  <p>📍 <strong>${t("Landmark")}:</strong> ${c.landmark}</p>
+                  <p>🏢 <strong>${t("Station")}:</strong> ${t(c.police_station)}</p>
+                  <p>📅 <strong>${t("Date")}:</strong> ${c.reported_date}</p>
+                </div>
+              </div>
+            `;
+            marker.bindPopup(popupHtml, { minWidth: 220 });
+            markersLayer.addLayer(marker);
+          } else {
+            const count = cluster.cases.length;
+            const clusterIcon = L.divIcon({
+              className: 'custom-leaflet-cluster-wrapper',
+              html: `<div class="cluster-bubble"><span>${count}</span></div>`,
+              iconSize: [40, 40],
+              iconAnchor: [20, 20],
+            });
+
+            const marker = L.marker([cluster.latitude, cluster.longitude], { icon: clusterIcon });
+            
+            const popupHtml = `
+              <div class="map-popup-card cluster-popup">
+                <h4>📂 ${count} ${t("Cases in this Area")}</h4>
+                <div class="popup-cluster-list">
+                  ${cluster.cases.slice(0, 5).map(c => `
+                    <div class="cluster-list-item">
+                      <span><strong>${c.case_number}</strong>: ${t(c.crime_type)}</span>
+                    </div>
+                  `).join('')}
+                  ${count > 5 ? `<div class="cluster-more-text">+ ${count - 5} ${t("more cases")}</div>` : ''}
+                </div>
+              </div>
+            `;
+            marker.bindPopup(popupHtml, { minWidth: 200 });
+            markersLayer.addLayer(marker);
+          }
+        });
+      };
+
+      drawMarkers();
+      map.on('zoomend', drawMarkers);
+      map.on('moveend', drawMarkers);
+
+      return () => {
+        map.off('zoomend', drawMarkers);
+        map.off('moveend', drawMarkers);
+      };
+    } else {
+      // Heatmap view using HTML5 Canvas
+      const CustomCanvasLayer = L.Layer.extend({
+        onAdd: function(map: L.Map) {
+          const pane = map.getPane('overlayPane')!;
+          const container = L.DomUtil.create('canvas', 'leaflet-heatmap-layer') as HTMLCanvasElement;
+          this._canvas = container;
+          const size = map.getSize();
+          container.width = size.x;
+          container.height = size.y;
+          pane.appendChild(container);
+          map.on('move', this._update, this);
+          this._update();
+        },
+        onRemove: function(map: L.Map) {
+          L.DomUtil.remove(this._canvas);
+          map.off('move', this._update, this);
+        },
+        _update: function() {
+          const canvas = this._canvas;
+          const ctx = canvas.getContext('2d');
+          const size = map.getSize();
+          const topLeft = map.containerPointToLayerPoint([0, 0]);
+          L.DomUtil.setPosition(canvas, topLeft);
+          ctx.clearRect(0, 0, size.x, size.y);
+
+          filteredCases.forEach(c => {
+            const latlng = L.latLng(c.latitude, c.longitude);
+            const containerPoint = map.latLngToContainerPoint(latlng);
+            const radius = 35;
+            const gradient = ctx.createRadialGradient(
+              containerPoint.x, containerPoint.y, 2,
+              containerPoint.x, containerPoint.y, radius
+            );
+            gradient.addColorStop(0, 'rgba(168, 35, 41, 0.45)');
+            gradient.addColorStop(0.5, 'rgba(168, 35, 41, 0.15)');
+            gradient.addColorStop(1, 'rgba(168, 35, 41, 0)');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(containerPoint.x, containerPoint.y, radius, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        }
+      });
+
+      const heatmapLayer = new (CustomCanvasLayer as any)();
+      heatmapLayer.addTo(map);
+      canvasLayerRef.current = heatmapLayer;
+    }
+  }, [filteredCases, viewMode, locale]);
+
+  // Statistics for the sidebar
+  const getStats = () => {
+    const stats: Record<string, number> = {};
+    filteredCases.forEach(c => {
+      stats[c.crime_type] = (stats[c.crime_type] || 0) + 1;
+    });
+    return Object.entries(stats).sort((a, b) => b[1] - a[1]);
+  };
+
+  return (
+    <div className="gis-map-workspace animate-fade-in">
+      {/* Data Source Status Banner */}
+      {dataSource && (
+        <div className={`data-source-toast ${dataSource}`}>
+          {dataSource === 'remote' ? (
+            <>
+              <span className="source-dot live"></span>
+              {t("Live connection to Supabase DB active")}
+            </>
+          ) : (
+            <>
+              <span className="source-dot fallback"></span>
+              {t("Connection failed. Fallback to Local DB")}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Main Map & Dashboard Layout */}
+      <div className="map-view-layout">
+        {/* Left Side: Leaflet Canvas Map */}
+        <div className="map-canvas-container">
+          <div ref={mapContainerRef} className="leaflet-map-element" />
+          
+          {/* No results overlay */}
+          {noResults && (
+            <div className="map-no-results-overlay">
+              <div className="no-results-card">
+                <span className="no-results-icon">🔍</span>
+                <p>{t("No cases found matching these filters.")}</p>
+                <button className="reset-search-btn" onClick={handleReset}>
+                  {t("Reset Filters")}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Map floating toggles */}
+          <div className="map-floating-controls">
+            <button 
+              className={`map-ctrl-btn ${viewMode === 'markers' ? 'active' : ''}`}
+              onClick={() => setViewMode('markers')}
+            >
+              📍 {t("Marker Clusters")}
+            </button>
+            <button 
+              className={`map-ctrl-btn ${viewMode === 'heatmap' ? 'active' : ''}`}
+              onClick={() => setViewMode('heatmap')}
+            >
+              🔥 {t("Heatmap Density")}
+            </button>
+          </div>
+        </div>
+
+        {/* Right Side: Map Controls & Side Panel Dashboard */}
+        <aside className="map-sidebar-control-panel">
+          {/* Section 1: Filters */}
+          <div className="sidebar-card">
+            <h3>🔍 {t("Filter Cases")}</h3>
+            
+            <div className="filter-input-group">
+              <label>{t("Search Keyword")}</label>
+              <input
+                type="text"
+                placeholder={t("Search by FIR ID or landmark...")}
+                value={draftSearch}
+                onChange={e => setDraftSearch(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
+                className="map-filter-input"
+              />
+            </div>
+
+            <div className="filter-input-group">
+              <label>{t("Crime Types")}</label>
+              <select 
+                value={draftType} 
+                onChange={e => setDraftType(e.target.value)}
+                className="map-filter-select"
+              >
+                <option value="">{t("All Categories")} ({cases.length})</option>
+                {uniqueCrimeTypes.map(type => (
+                  <option key={type} value={type}>{t(type)}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-input-group">
+              <label>{t("Police Station")}</label>
+              <select 
+                value={draftStation} 
+                onChange={e => setDraftStation(e.target.value)}
+                className="map-filter-select"
+              >
+                <option value="">{t("All Stations")}</option>
+                {uniqueStations.map(station => (
+                  <option key={station} value={station}>{t(station)}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-row-two-col">
+              <div className="filter-input-group">
+                <label>{t("Start Date")}</label>
+                <input
+                  type="date"
+                  value={draftStartDate}
+                  onChange={e => setDraftStartDate(e.target.value)}
+                  className="map-filter-input"
+                />
+              </div>
+              <div className="filter-input-group">
+                <label>{t("End Date")}</label>
+                <input
+                  type="date"
+                  value={draftEndDate}
+                  onChange={e => setDraftEndDate(e.target.value)}
+                  className="map-filter-input"
+                />
+              </div>
+            </div>
+
+            <div className="filter-input-group">
+              <label>{t("Case Status")}</label>
+              <select 
+                value={draftStatus} 
+                onChange={e => setDraftStatus(e.target.value)}
+                className="map-filter-select"
+              >
+                <option value="">{t("All Statuses")}</option>
+                <option value="Active">🔴 {t("Active Cases")}</option>
+                <option value="Under Investigation">🟠 {t("Unsolved Cases")} ({t("Under Investigation")})</option>
+                <option value="Closed">🟢 {t("Solved Cases")} ({t("Closed")})</option>
+              </select>
+            </div>
+
+            {/* Search & Reset Buttons */}
+            <div className="filter-actions-row">
+              <button className="search-cases-btn" onClick={handleSearch}>
+                🔍 {t("Search Cases")}
+              </button>
+              <button className="reset-cases-btn" onClick={handleReset}>
+                ↻ {t("Reset")}
+              </button>
+            </div>
+          </div>
+
+          {/* Section 2: Summary Stats */}
+          <div className="sidebar-card summary-card">
+            <h3>📊 {t("Total Cases")}</h3>
+            <div className="big-number-indicator">
+              {loading ? (
+                <div className="map-loader-mini"></div>
+              ) : (
+                <span>{filteredCases.length}</span>
+              )}
+            </div>
+            
+            {/* Visual Breakdown progress bars */}
+            {!loading && filteredCases.length > 0 && (
+              <div className="crime-breakdown-list">
+                <h4>{t("Crime Distribution")}</h4>
+                {getStats().map(([type, count]) => {
+                  const percentage = Math.round((count / filteredCases.length) * 100);
+                  return (
+                    <div key={type} className="breakdown-progress-row">
+                      <div className="progress-labels">
+                        <span className="progress-type">{t(type)}</span>
+                        <span className="progress-count">{count}</span>
+                      </div>
+                      <div className="progress-bar-track">
+                        <div className="progress-bar-fill" style={{ width: `${percentage}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
+};
+
+export default GisMap;
