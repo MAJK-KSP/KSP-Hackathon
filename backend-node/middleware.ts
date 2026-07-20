@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
-import { validateSession, User } from './auth';
+import { validateSession, User, SESSION_COOKIE_NAME, getCookieOptions } from './auth';
 
 // Custom interface to extend Express Request with the validated user
 export interface AuthenticatedRequest extends Request {
@@ -22,7 +22,7 @@ export const securityHeaders = (
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com translate.googleapis.com; " +
     "font-src 'self' https://fonts.gstatic.com; " +
     "img-src 'self' data: translate.google.com translate.googleapis.com www.google.com www.google.co.in; " +
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' translate.google.com translate.googleapis.com; " +
+    "script-src 'self' translate.google.com translate.googleapis.com; " +
     "connect-src 'self' translate.googleapis.com; " +
     "frame-src 'self' translate.google.com; " +
     "frame-ancestors 'none';"
@@ -61,7 +61,7 @@ export const authenticateSession = async (
   res: Response,
   next: NextFunction
 ) => {
-  const sessionId = req.cookies.session_id;
+  const sessionId = req.cookies[SESSION_COOKIE_NAME];
 
   if (!sessionId) {
     return res.status(401).json({ error: 'Unauthorized: No session token provided' });
@@ -71,12 +71,8 @@ export const authenticateSession = async (
     const user = await validateSession(sessionId);
 
     if (!user) {
-      // Clear invalid cookie
-      res.clearCookie('session_id', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-      });
+      // Clear invalid cookie using same parameters as set
+      res.clearCookie(SESSION_COOKIE_NAME, getCookieOptions());
       return res.status(401).json({ error: 'Unauthorized: Session has expired or is invalid' });
     }
 

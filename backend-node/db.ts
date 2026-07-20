@@ -105,6 +105,7 @@ export const initDb = async () => {
     );
   `);
 
+<<<<<<< HEAD:src/db.ts
   // User roles table
   await runQuery(`
     CREATE TABLE IF NOT EXISTS user_roles (
@@ -127,10 +128,23 @@ export const initDb = async () => {
       priority TEXT DEFAULT 'normal',
       effective_date TEXT NOT NULL,
       expires_at TEXT,
+=======
+  // Create security_logs table
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS security_logs (
+      id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      user_id TEXT,
+      email TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      details TEXT,
+>>>>>>> 6a370080535596fdbbd6a7d629182b5006792938:backend-node/db.ts
       created_at TEXT NOT NULL
     );
   `);
 
+<<<<<<< HEAD:src/db.ts
   await runQuery(`CREATE INDEX IF NOT EXISTS idx_briefings_date ON daily_briefings(effective_date);`);
 
   // Chat conversations
@@ -281,4 +295,12 @@ const seedCases = async () => {
   } catch (err) {
     console.error('Failed to seed cases database:', err);
   }
+=======
+  // Index on security_logs created_at for faster lookup and log rotation
+  await runQuery(`
+    CREATE INDEX IF NOT EXISTS idx_security_logs_created_at ON security_logs(created_at);
+  `);
+
+  console.log('Database initialized successfully at:', dbPath);
+>>>>>>> 6a370080535596fdbbd6a7d629182b5006792938:backend-node/db.ts
 };

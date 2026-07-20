@@ -4,8 +4,13 @@ import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import { z } from 'zod';
+<<<<<<< HEAD:src/server.ts
 import postgres from 'postgres';
 import { initDb, getRow, runQuery, getAllRows } from './db';
+=======
+import crypto from 'crypto';
+import { initDb, getRow, runQuery } from './db';
+>>>>>>> 6a370080535596fdbbd6a7d629182b5006792938:backend-node/server.ts
 import {
   hashPassword,
   verifyPassword,
@@ -17,6 +22,12 @@ import {
   revokeSession,
   User,
   passwordSchema,
+  hashSessionId,
+  encryptSecret,
+  decryptSecret,
+  logSecurityEvent,
+  SESSION_COOKIE_NAME,
+  getCookieOptions,
 } from './auth';
 import {
   authLimiter,
@@ -32,6 +43,9 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Enable proxy trust to support standard reverse proxies/load balancers (e.g. NIC web gateway)
+app.set('trust proxy', 1);
+
 // Middleware Setup
 app.use(express.json());
 app.use(cookieParser());
@@ -45,11 +59,11 @@ const publicPath = fs.existsSync(path.resolve(__dirname, '../dist/public'))
   ? path.resolve(__dirname, '../dist/public')
   : fs.existsSync(path.resolve(__dirname, 'public'))
     ? path.resolve(__dirname, 'public')
-    : path.resolve(__dirname, '../src/public');
+    : path.resolve(__dirname, '../frontend/public');
 
 // Page Routes (with Secure Redirects for React SPA)
 app.get(['/', '/dashboard', '/profile', '/security'], async (req, res) => {
-  const sessionId = req.cookies.session_id;
+  const sessionId = req.cookies[SESSION_COOKIE_NAME];
   const isRoot = req.path === '/';
   
   if (sessionId) {
@@ -141,13 +155,17 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       req.ip || null
     );
 
-    // Set secure cookie
-    res.cookie('session_id', session.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
-    });
+    // Set secure cookie using dynamic parameters
+    res.cookie(SESSION_COOKIE_NAME, session.id, getCookieOptions(24 * 60 * 60 * 1000));
+
+    await logSecurityEvent(
+      'login_success_no_mfa',
+      user.id,
+      user.email,
+      req.ip || null,
+      req.headers['user-agent'] || null,
+      'User logged in successfully without MFA'
+    );
 
     return res.status(200).json({
       success: true,
@@ -173,9 +191,18 @@ app.post('/api/auth/mfa/setup', authenticateSession, async (req: AuthenticatedRe
     const { secret, otpauthUrl } = generateMfaSecret(user.email);
     const qrCodeUrl = await generateQrCodeDataUrl(otpauthUrl);
 
-    // Save the secret to temp_mfa_secret. We leave the active mfa_secret and mfa_enabled intact
-    // to prevent locking the user out or disabling their active 2FA until they verify the new setup.
-    await runQuery('UPDATE users SET temp_mfa_secret = ? WHERE id = ?', [secret, user.id]);
+    // Encrypt TOTP secret before saving to the database
+    const encryptedSecret = encryptSecret(secret);
+    await runQuery('UPDATE users SET temp_mfa_secret = ? WHERE id = ?', [encryptedSecret, user.id]);
+
+    await logSecurityEvent(
+      'mfa_setup_initiated',
+      user.id,
+      user.email,
+      req.ip || null,
+      req.headers['user-agent'] || null,
+      'MFA setup initiated'
+    );
 
     return res.status(200).json({
       secret,
@@ -200,7 +227,7 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
 
     if (is_setup) {
       // MFA Setup verification: requires an active session
-      const sessionId = req.cookies.session_id;
+      const sessionId = req.cookies[SESSION_COOKIE_NAME];
       if (!sessionId) {
         return res.status(401).json({ error: 'Unauthorized: Session required for MFA setup' });
       }
@@ -215,12 +242,21 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
         return res.status(400).json({ error: 'MFA session token is required' });
       }
       
+      const hashedMfaToken = hashSessionId(mfa_token);
       const pendingSession = await getRow<{ user_id: string; expires_at: string }>(
         `SELECT user_id, expires_at FROM sessions WHERE id = ? AND user_agent = 'mfa_pending'`,
-        [mfa_token]
+        [hashedMfaToken]
       );
 
       if (!pendingSession || new Date(pendingSession.expires_at) < new Date()) {
+        await logSecurityEvent(
+          'mfa_verification_failed',
+          null,
+          null,
+          req.ip || null,
+          req.headers['user-agent'] || null,
+          'Invalid or expired pending session token'
+        );
         return res.status(401).json({ error: 'MFA session expired or invalid. Please log in again.' });
       }
 
@@ -236,8 +272,8 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
       return res.status(400).json({ error: 'User not found' });
     }
 
-    const secretToVerify = is_setup ? userRecord.temp_mfa_secret : userRecord.mfa_secret;
-    if (!secretToVerify) {
+    const encryptedSecret = is_setup ? userRecord.temp_mfa_secret : userRecord.mfa_secret;
+    if (!encryptedSecret) {
       return res.status(400).json({
         error: is_setup
           ? 'MFA setup has not been initiated. Please generate a QR code first.'
@@ -245,9 +281,25 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
       });
     }
 
+    // Decrypt the secret to verify the TOTP token (fallback to plaintext for legacy compatibility)
+    let secretToVerify = '';
+    try {
+      secretToVerify = decryptSecret(encryptedSecret);
+    } catch (err) {
+      secretToVerify = encryptedSecret;
+    }
+
     // Verify code
     const isValid = verifyTotpToken(code, secretToVerify);
     if (!isValid) {
+      await logSecurityEvent(
+        'mfa_verification_failed',
+        userId,
+        userRecord.email,
+        req.ip || null,
+        req.headers['user-agent'] || null,
+        'Invalid TOTP code provided'
+      );
       return res.status(400).json({ error: 'Invalid verification code' });
     }
 
@@ -256,6 +308,23 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
       await runQuery(
         'UPDATE users SET mfa_secret = temp_mfa_secret, temp_mfa_secret = NULL, mfa_enabled = 1 WHERE id = ?',
         [userId]
+      );
+      await logSecurityEvent(
+        'mfa_enabled',
+        userId,
+        userRecord.email,
+        req.ip || null,
+        req.headers['user-agent'] || null,
+        'MFA successfully configured and enabled'
+      );
+    } else {
+      await logSecurityEvent(
+        'login_success_mfa',
+        userId,
+        userRecord.email,
+        req.ip || null,
+        req.headers['user-agent'] || null,
+        'User logged in successfully with MFA'
       );
     }
 
@@ -266,13 +335,8 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
       req.ip || null
     );
 
-    // Set cookie
-    res.cookie('session_id', session.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000,
-    });
+    // Set cookie using dynamic parameters
+    res.cookie(SESSION_COOKIE_NAME, session.id, getCookieOptions(24 * 60 * 60 * 1000));
 
     return res.status(200).json({
       success: true,
@@ -292,16 +356,20 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
 // 5. Logout
 app.post('/api/auth/logout', authenticateSession, async (req: AuthenticatedRequest, res) => {
   try {
-    const sessionId = req.cookies.session_id;
+    const sessionId = req.cookies[SESSION_COOKIE_NAME];
     if (sessionId) {
       await revokeSession(sessionId);
+      await logSecurityEvent(
+        'logout',
+        req.user?.id || null,
+        req.user?.email || null,
+        req.ip || null,
+        req.headers['user-agent'] || null,
+        'User logged out successfully'
+      );
     }
 
-    res.clearCookie('session_id', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-    });
+    res.clearCookie(SESSION_COOKIE_NAME, getCookieOptions());
 
     return res.status(200).json({ success: true, message: 'Logged out successfully' });
   } catch (error) {
@@ -343,11 +411,49 @@ app.get('/api/profile', authenticateSession, async (req: AuthenticatedRequest, r
   }
 });
 
-// 8. Update Officer Profile
+// Validation Schemas for Profile inputs
+const rankSchema = z.enum([
+  'Superintendent of Police (SP)',
+  'Deputy Superintendent of Police (DySP)',
+  'Inspector of Police',
+  'Sub-Inspector of Police (PSI)',
+  'Assistant Sub-Inspector (ASI)',
+  'Head Constable',
+  'Constable',
+]);
+
+const designationSchema = z.enum([
+  'Station House Officer (SHO)',
+  'Investigating Officer (IO)',
+  'Duty Officer',
+  'Crime Branch Head',
+  'Traffic In-charge',
+  'Patrol Officer',
+]);
+
+const jurisdictionSchema = z.enum([
+  'Bengaluru City Police',
+  'Mysuru City Police',
+  'Mangaluru City Police',
+  'Hubballi-Dharwad City Police',
+  'Belagavi City Police',
+  'Kalaburagi City Police',
+]);
+
+const profileInputSchema = z.object({
+  badge_number: z.string().min(3).max(20).regex(/^[A-Z0-9\-]+$/i, 'Invalid badge number format'),
+  rank: rankSchema,
+  post: designationSchema,
+  jurisdiction: jurisdictionSchema,
+  area: z.string().min(2).max(50),
+  station: z.string().min(2).max(50),
+});
+
+// 8. Update Officer Profile (Validated)
 app.post('/api/profile', authenticateSession, async (req: AuthenticatedRequest, res) => {
   try {
     const user = req.user!;
-    const { badge_number, rank, post, jurisdiction, area, station } = req.body;
+    const validatedData = profileInputSchema.parse(req.body);
 
     const existing = await getRow('SELECT 1 FROM officer_profiles WHERE user_id = ?', [user.id]);
     if (existing) {
@@ -355,18 +461,54 @@ app.post('/api/profile', authenticateSession, async (req: AuthenticatedRequest, 
         `UPDATE officer_profiles 
          SET badge_number = ?, rank = ?, post = ?, jurisdiction = ?, area = ?, station = ? 
          WHERE user_id = ?`,
-        [badge_number || '', rank || '', post || '', jurisdiction || '', area || '', station || '', user.id]
+        [
+          validatedData.badge_number,
+          validatedData.rank,
+          validatedData.post,
+          validatedData.jurisdiction,
+          validatedData.area,
+          validatedData.station,
+          user.id,
+        ]
       );
     } else {
       await runQuery(
         `INSERT INTO officer_profiles (user_id, badge_number, rank, post, jurisdiction, area, station) 
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [user.id, badge_number || '', rank || '', post || '', jurisdiction || '', area || '', station || '']
+        [
+          user.id,
+          validatedData.badge_number,
+          validatedData.rank,
+          validatedData.post,
+          validatedData.jurisdiction,
+          validatedData.area,
+          validatedData.station,
+        ]
       );
     }
 
+    await logSecurityEvent(
+      'profile_update_success',
+      user.id,
+      user.email,
+      req.ip || null,
+      req.headers['user-agent'] || null,
+      'Officer profile details updated'
+    );
+
     return res.status(200).json({ success: true, message: 'Profile updated successfully' });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      await logSecurityEvent(
+        'profile_update_failed',
+        req.user?.id || null,
+        req.user?.email || null,
+        req.ip || null,
+        req.headers['user-agent'] || null,
+        `Validation failed: ${JSON.stringify(error.errors)}`
+      );
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
     console.error('Error updating profile:', error);
     return res.status(500).json({ error: 'Internal server error updating profile' });
   }
