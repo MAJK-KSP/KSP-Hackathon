@@ -20,6 +20,9 @@ interface User {
   created_at: string;
 }
 
+import { UserManagement } from './components/UserManagement';
+import { GisMap } from './components/GisMap';
+
 // Inner component to access router hooks
 const AppContent: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -98,6 +101,8 @@ const AppContent: React.FC = () => {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/security" element={<Security user={user} onMfaEnabled={checkSession} />} />
+        <Route path="/users" element={<UserManagement />} />
+        <Route path="/map" element={<GisMap />} />
         <Route path="/chat" element={<AiChat isFullPage={true} />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

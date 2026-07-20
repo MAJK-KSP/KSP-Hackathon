@@ -31,7 +31,7 @@ export interface User {
   password_hash: string;
   mfa_secret: string | null;
   temp_mfa_secret?: string | null;
-  mfa_enabled: number; // 0 or 1
+  mfa_enabled: boolean | number;
   created_at: string;
 }
 
@@ -109,7 +109,7 @@ export const validateSession = async (sessionId: string): Promise<User | null> =
   const sessionUser = await getRow<{
     id: string;
     email: string;
-    mfa_enabled: number;
+    mfa_enabled: boolean | number;
     created_at: string;
     expires_at: string;
   }>(

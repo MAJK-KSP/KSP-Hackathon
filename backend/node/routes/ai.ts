@@ -641,7 +641,7 @@ aiRouter.post('/transcribe', async (req: RoleAwareRequest, res: Response) => {
     console.log(`[Node Proxy] Forwarding transcription request to: ${pythonTranscribeUrl}`);
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 seconds timeout
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 seconds timeout
 
     try {
       const response = await fetch(pythonTranscribeUrl, {
@@ -667,7 +667,7 @@ aiRouter.post('/transcribe', async (req: RoleAwareRequest, res: Response) => {
     } catch (fetchErr: any) {
       clearTimeout(timeoutId);
       if (fetchErr.name === 'AbortError') {
-        console.error('[Node Proxy] Transcription proxy request timed out after 15 seconds.');
+        console.error('[Node Proxy] Transcription proxy request timed out after 60 seconds.');
         return res.status(504).json({ error: 'Transcription request timed out.' });
       }
       throw fetchErr;
@@ -675,6 +675,75 @@ aiRouter.post('/transcribe', async (req: RoleAwareRequest, res: Response) => {
   } catch (error: any) {
     console.error('Error proxying transcription request:', error);
     return res.status(500).json({ error: `Internal server error during transcription: ${error.message}` });
+  }
+});
+
+// ============================================================================
+// VOICE SYNTHESIS (TTS) ENDPOINT
+// ============================================================================
+
+/**
+ * POST /api/ai/synthesize
+ * Synthesize text to audio using Zoho Zia via Python backend proxy
+ */
+aiRouter.post('/synthesize', async (req: RoleAwareRequest, res: Response) => {
+  try {
+    const { text, language, speaker, emotion } = req.body;
+    if (!text) {
+      return res.status(400).json({ error: 'Text payload is required for synthesis' });
+    }
+
+    const pythonSynthesizeUrl = getPythonUrl('/synthesize');
+    console.log(`[Node Proxy] Forwarding synthesis request to: ${pythonSynthesizeUrl}`);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 seconds timeout
+
+    try {
+      const response = await fetch(pythonSynthesizeUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text,
+          language: language || 'English',
+          speaker: speaker || 'female',
+          emotion: emotion || 'neutral'
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[Node Proxy] Python synthesis backend responded with status: ${response.status}. Error: ${errorText}`);
+        return res.status(response.status).json({ error: `Python backend synthesis error: ${errorText}` });
+      }
+
+      const contentType = response.headers.get('content-type') || 'audio/wav';
+      res.setHeader('Content-Type', contentType);
+
+      if (contentType.includes('application/json')) {
+        const data = await response.json();
+        return res.status(200).json(data);
+      } else {
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        return res.status(200).send(buffer);
+      }
+    } catch (fetchErr: any) {
+      clearTimeout(timeoutId);
+      if (fetchErr.name === 'AbortError') {
+        console.error('[Node Proxy] Synthesis proxy request timed out after 60 seconds.');
+        return res.status(504).json({ error: 'Synthesis request timed out.' });
+      }
+      throw fetchErr;
+    }
+  } catch (error: any) {
+    console.error('Error proxying synthesis request:', error);
+    return res.status(500).json({ error: `Internal server error during synthesis: ${error.message}` });
   }
 });
 

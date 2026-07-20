@@ -33,8 +33,9 @@ class Settings(BaseSettings):
     zoho_refresh_token: str = ""
     zoho_client_id: str = ""
     zoho_client_secret: str = ""
-    catalyst_org: str = "60076334355"
+    catalyst_org: str = "80076334355"
     quickml_endpoint_url: str = "https://api.catalyst.zoho.in/quickml/v1/project/54759000000026001/vlm/chat"
+    zia_tts_endpoint_url: str = "https://api.catalyst.zoho.in/quickml/api/v1/models/zia/tts/synthesize"
 
     # Application
     app_env: str = "development"

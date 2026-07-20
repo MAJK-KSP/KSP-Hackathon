@@ -34,6 +34,10 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
         return t("Officer Profile");
       case '/security':
         return t("MFA Security");
+      case '/users':
+        return t("User Management & RBAC");
+      case '/map':
+        return t("GIS Command Map");
       case '/chat':
         return t("AI Assistant");
       default:
@@ -95,6 +99,25 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
               </svg>
               <span>{t("MFA Security")}</span>
+            </NavLink>
+
+            <NavLink to="/users" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+              <span>{t("User Management")}</span>
+            </NavLink>
+
+            <NavLink to="/map" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon>
+                <line x1="9" y1="3" x2="9" y2="18"></line>
+                <line x1="15" y1="6" x2="15" y2="21"></line>
+              </svg>
+              <span>{t("GIS Command Map")}</span>
             </NavLink>
 
             <NavLink to="/chat" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>

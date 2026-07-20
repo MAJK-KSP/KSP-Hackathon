@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from routes.briefing import router as briefing_router
 from routes.transcribe import router as transcribe_router
+from routes.synthesize import router as synthesize_router
 from services.db import init_db
 
 
@@ -63,6 +64,7 @@ app.add_middleware(
 
 app.include_router(briefing_router)
 app.include_router(transcribe_router)
+app.include_router(synthesize_router)
 
 
 # ---------------------------------------------------------------------------
@@ -179,17 +181,28 @@ async def chat_with_db(request: ChatRequest):
     logger = logging.getLogger("uvicorn.error")
 
     # Reconstruct conversation history for Pydantic AI context-awareness
+    # Limit to last 4 messages to keep context focused and prevent the model
+    # from losing awareness of its tools in long conversations
+    recent_history = request.history[-4:] if len(request.history) > 4 else request.history
     model_messages = []
-    for h in request.history:
+    for h in recent_history:
         if h.role == 'user':
             model_messages.append(ModelRequest(parts=[UserPromptPart(content=h.content)]))
         elif h.role == 'assistant':
-            model_messages.append(ModelResponse(parts=[TextPart(content=h.content)]))
+            # Truncate long assistant responses to keep context compact
+            truncated = h.content[:300] + '...' if len(h.content) > 300 else h.content
+            model_messages.append(ModelResponse(parts=[TextPart(content=truncated)]))
 
-    # Append a context reminder for follow-up queries to enforce schema rules on small LLM runs
     prompt_message = request.message
-    if request.history:
-        prompt_message += "\n\n(Context reminder: Only query from the views 'overnight_incidents', 'active_cases', or 'repeat_offenders'. Do not attempt to query any other table like 'trials_data'.)"
+    # When there's conversation history and the message looks like a data question,
+    # inject table names so the model uses correct names in follow-up queries.
+    # Skip for greetings, thanks, and casual messages.
+    if model_messages:
+        msg_lower = request.message.strip().lower()
+        greeting_patterns = ['hello', 'hi', 'hey', 'thanks', 'thank you', 'ok', 'okay', 'bye', 'good', 'great', 'nice', 'cool', 'sure', 'yes', 'no', 'got it']
+        is_greeting = any(msg_lower.startswith(g) or msg_lower == g for g in greeting_patterns) and len(msg_lower) < 50
+        if not is_greeting:
+            prompt_message += "\n\n[Available tables: casemaster, crimehead, unit, casestatusmaster, overnight_incidents, active_cases, repeat_offenders, accused, victim, complainantdetails, chargesheetdetails, act, section, arrestsurrender. Use execute_select_query tool.]"
 
     async def event_generator():
         queue = asyncio.Queue()
@@ -203,11 +216,8 @@ async def chat_with_db(request: ChatRequest):
         
         start_time = time.time()
         
-        # Accumulators for streamed details
-        streamed_steps = [
-            "Started AI Database Agent session.",
-            "Analyzed user query and checked safety constraints."
-        ]
+        # Accumulators for streamed details (no hardcoded steps — only real ones)
+        streamed_steps = []
         streamed_queries = []
         
         def process_queue_item(item):
@@ -221,10 +231,6 @@ async def chat_with_db(request: ChatRequest):
                     content = item.get("content")
                     if content and content not in streamed_queries:
                         streamed_queries.append(content)
-
-        # Stream first two static reasoning steps immediately
-        yield json.dumps({"type": "reasoning_step", "content": "Started AI Database Agent session."}) + "\n"
-        yield json.dumps({"type": "reasoning_step", "content": "Analyzed user query and checked safety constraints."}) + "\n"
         
         # Listen to queue and stream updates
         while not agent_task.done():
@@ -262,6 +268,7 @@ async def chat_with_db(request: ChatRequest):
             sql_queries = list(streamed_queries)
             reasoning_steps = list(streamed_steps)
             
+            # Extract any SQL queries from tool calls that weren't caught during streaming
             for msg in result.all_messages():
                 if hasattr(msg, 'parts'):
                     for part in msg.parts:
@@ -284,31 +291,6 @@ async def chat_with_db(request: ChatRequest):
                                     sql_query = args_data['object']['sql']
                             if sql_query and sql_query not in sql_queries:
                                 sql_queries.append(sql_query)
-                                step1 = f"Formulated SQL query: {sql_query}"
-                                if step1 not in reasoning_steps:
-                                    reasoning_steps.append(step1)
-                                step2 = "Dispatched query request to Supabase PostgreSQL database."
-                                if step2 not in reasoning_steps:
-                                    reasoning_steps.append(step2)
-                                
-                        elif part_type == 'ToolReturnPart' or part_type == 'ToolResultPart':
-                            ret_content = str(getattr(part, 'content', ''))
-                            if "Error" in ret_content or "unsafe" in ret_content.lower():
-                                step = f"Database query failed or was rejected: {ret_content[:100]}..."
-                                if step not in reasoning_steps:
-                                    reasoning_steps.append(step)
-                            else:
-                                step = "Database query executed successfully. Retrieved records."
-                                if step not in reasoning_steps:
-                                    reasoning_steps.append(step)
-                        elif part_type == 'RetryPromptPart':
-                            step = "Validation warning triggered. Correcting query format and arguments."
-                            if step not in reasoning_steps:
-                                reasoning_steps.append(step)
-            
-            final_step = "Compiled final response and rendered markdown results table."
-            if final_step not in reasoning_steps:
-                reasoning_steps.append(final_step)
             
             # Send final response structure
             yield json.dumps({

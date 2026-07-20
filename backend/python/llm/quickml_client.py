@@ -109,7 +109,13 @@ class ZohoQuickMLTransport(httpx.AsyncHTTPTransport):
                     else:
                         prompt_parts.append(f"User: {content}")
                 elif role == "assistant":
-                    prompt_parts.append(f"Assistant: {content}")
+                    if content:
+                        prompt_parts.append(f"Assistant: {content}")
+                    elif msg.get("tool_calls"):
+                        tc_info = [tc.get("function", {}).get("arguments", "") for tc in msg.get("tool_calls", [])]
+                        prompt_parts.append(f"Assistant (Tool Executed): {', '.join(tc_info)}")
+                elif role in ("tool", "function"):
+                    prompt_parts.append(f"Database Query Output: {content}\n(Instructions: Present the final answer to the user based on the database output above. Do NOT write SQL queries again.)")
             
             # Use 1x1 transparent PNG fallback if images list is empty to bypass Zoho validation constraints
             if not images_list:
@@ -119,6 +125,12 @@ class ZohoQuickMLTransport(httpx.AsyncHTTPTransport):
                 prompt = prompt_parts[0][len("User: "):]
             else:
                 prompt = "\n".join(prompt_parts)
+
+            # When there is multi-turn history AND no tool result yet in this turn,
+            # inject a tool reminder so the model doesn't forget its database tools
+            has_tool_result = any(msg.get("role") in ("tool", "function") for msg in messages)
+            if len(prompt_parts) > 1 and not has_tool_result:
+                prompt += "\n\n[IMPORTANT REMINDER: You MUST use the execute_select_query tool to query the database. Write the SQL inside <execute_select_query>YOUR SQL HERE</execute_select_query> tags. Do NOT answer from general knowledge.]"
                 
             quickml_data = {
                 "prompt": prompt,
@@ -128,7 +140,7 @@ class ZohoQuickMLTransport(httpx.AsyncHTTPTransport):
                 "temperature": req_data.get("temperature", 0.7),
                 "top_k": 50,
                 "top_p": 0.9,
-                "max_tokens": req_data.get("max_tokens", 500)
+                "max_tokens": req_data.get("max_tokens", 2048)
             }
             
             # Rewrite request content and stream
@@ -145,7 +157,7 @@ class ZohoQuickMLTransport(httpx.AsyncHTTPTransport):
         # Read the raw response content
         await response.aread()
         content_str = response.content.decode("utf-8")
-        print(f"Zoho QuickML raw response: {content_str}")
+        logger.info(f"Zoho QuickML raw response length: {len(content_str)}")
         
         try:
             data = json.loads(content_str)
@@ -170,6 +182,9 @@ class ZohoQuickMLTransport(httpx.AsyncHTTPTransport):
                             
                 import re
                 
+                # Check if history already contains a tool result
+                has_tool_result = any(msg.get("role") in ("tool", "function") for msg in messages)
+                
                 # Check if the model tried to call the execute_select_query tool
                 sql_query = None
                 
@@ -177,16 +192,36 @@ class ZohoQuickMLTransport(httpx.AsyncHTTPTransport):
                 m1 = re.search(r"<execute_select_query>\s*(.*?)\s*</execute_select_query>", generated_text, re.DOTALL | re.IGNORECASE)
                 if m1:
                     sql_query = m1.group(1).strip()
-                else:
-                    # Format 2: <tool_code>...execute_select_query("...")</tool_code>
-                    m2 = re.search(r"execute_select_query\(\s*(?:(?:query|sql)\s*=\s*)?[\"'](.*?)[\"']\s*\)", generated_text, re.DOTALL | re.IGNORECASE)
+                
+                # Format 2: <tool_code>...</tool_code>
+                if not sql_query:
+                    m2 = re.search(r"<tool_code>\s*(.*?)\s*</tool_code>", generated_text, re.DOTALL | re.IGNORECASE)
                     if m2:
-                        sql_query = m2.group(1).strip()
-                    else:
-                        # Format 3: markdown SQL block ```sql SELECT ... ```
-                        m3 = re.search(r"```sql\s*(.*?)\s*```", generated_text, re.DOTALL | re.IGNORECASE)
-                        if m3:
-                            sql_query = m3.group(1).strip()
+                        content = m2.group(1).strip()
+                        m2_inner = re.search(r"execute_select_query\(\s*(?:(?:query|sql)\s*=\s*)?[\"'](.*?)[\"']\s*\)", content, re.DOTALL | re.IGNORECASE)
+                        if m2_inner:
+                            sql_query = m2_inner.group(1).strip()
+                        else:
+                            sql_query = content
+
+                # Format 3: execute_select_query("...")
+                if not sql_query:
+                    m3 = re.search(r"execute_select_query\(\s*(?:(?:query|sql)\s*=\s*)?[\"'](.*?)[\"']\s*\)", generated_text, re.DOTALL | re.IGNORECASE)
+                    if m3:
+                        sql_query = m3.group(1).strip()
+
+                # Fallback formats (only if no tool result exists in history yet)
+                if not sql_query and not has_tool_result:
+                    # Format 4: ```sql SELECT ... ```
+                    m4 = re.search(r"```(?:sql)?\s*(.*?)\s*```", generated_text, re.DOTALL | re.IGNORECASE)
+                    if m4:
+                        sql_query = m4.group(1).strip()
+
+                    # Format 5: Raw SELECT / WITH statement
+                    if not sql_query:
+                        m5 = re.search(r"\b(SELECT|WITH)\b[\s\S]+?(?:;|$)", generated_text, re.IGNORECASE)
+                        if m5 and ("FROM" in generated_text.upper()):
+                            sql_query = m5.group(0).strip()
 
                 if sql_query:
                     openai_data = {

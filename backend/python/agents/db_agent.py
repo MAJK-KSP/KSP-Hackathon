@@ -23,20 +23,17 @@ def check_query_is_safe(sql: str) -> bool:
     """Ensure the SQL query is strictly read-only SELECT or WITH statement and contains no mutating commands."""
     sql_lower = sql.strip().lower()
     
-    log_reasoning_step("Verifying SQL query safety constraints and structure...")
-    
     # Must start with SELECT or WITH
     if not (sql_lower.startswith("select") or sql_lower.startswith("with")):
-        log_reasoning_step(f"Safety Validation Failed: Query must start with read-only 'SELECT' or 'WITH'. Received snippet: '{sql[:50]}...'")
+        log_reasoning_step(f"Blocked: Query must start with SELECT or WITH.")
         return False
     
     # Check for mutating keywords
     for keyword in MUTATION_KEYWORDS:
         if re.search(keyword, sql_lower):
-            log_reasoning_step(f"Safety Validation Failed: Detected illegal SQL mutation keyword '{keyword}' in query.")
+            log_reasoning_step(f"Blocked: Detected write operation in query.")
             return False
             
-    log_reasoning_step("Safety Validation Passed: Query contains only read-only SELECT/WITH statements.")
     return True
 
 # Initialize model pointing to Zoho QuickML with patch transport
@@ -47,41 +44,41 @@ Your sole purpose is to answer questions by querying the Supabase PostgreSQL dat
 Do NOT use external knowledge. Only answer based on what is in the database.
 If a question is unrelated to the database or requires external facts, politely say that you can only assist with information present in the database.
 
-To make querying easy, we have created flattened database VIEWS that you should query directly:
+Primary Tables and Views available in the Database:
 
-1. `overnight_incidents` view:
-   - `station_name` (text)
-   - `briefing_date` (date)
-   - `fir_number` (text)
-   - `time` (text)
-   - `type` (text) -- represents the type/category of crime (e.g. 'Residential Burglary', 'Assault')
-   - `location` (text)
-   - `description` (text)
-   - `severity` (text)
-   - `status` (text)
-   - `investigating_officer` (text)
+1. `casemaster` (Historical FIR & Crime Database - 10,400+ cases):
+   - `casemasterid` (int)
+   - `crimeno` / `caseno` (text)
+   - `crimeregistereddate` (datetime)
+   - `brieffacts` (text)
+   - `latitude` / `longitude` (float)
+   - `landmark` (text)
+   - `crimemajorheadid` (int, joins with `crimehead.crimeheadid`)
+   - `policestationid` (int, joins with `unit.unitid`)
+   - `casestatusid` (int, joins with `casestatusmaster.casestatusid`)
 
-2. `active_cases` view:
-   - `station_name` (text)
-   - `briefing_date` (date)
-   - `cr_number` (text)
-   - `fir_number` (text)
-   - `type` (text) -- represents the type/category of crime (e.g. 'Organised Theft Ring')
-   - `accused` (text)
-   - `status` (text)
-   - `next_hearing` (text)
-   - `priority` (text)
-   - `remarks` (text)
+2. `crimehead` (Crime Categories):
+   - `crimeheadid` (int)
+   - `crimegroupname` (text, e.g. 'THEFT', 'BURGLARY', 'MURDER', 'CYBER CRIME')
 
-3. `repeat_offenders` view:
-   - `name` (text)
-   - `alias` (text)
-   - `age` (text)
-   - `address` (text)
-   - `risk_level` (text)
-   - `total_cases` (text)
-   - `last_seen` (text)
-   - `remarks` (text)
+3. `unit` (Police Stations):
+   - `unitid` (int)
+   - `unitname` (text, e.g. 'Koramangala Police Station', 'Indiranagar PS')
+
+4. `casestatusmaster` (Case Status Names):
+   - `casestatusid` (int)
+   - `casestatusname` (text, e.g. 'Under Investigation', 'Pending Trial', 'Closed')
+
+5. `overnight_incidents` (Recent 24h Incidents):
+   - `station_name`, `briefing_date`, `fir_number`, `time`, `type`, `location`, `description`, `severity`, `status`, `investigating_officer`
+
+6. `active_cases` (Ongoing Briefing Cases):
+   - `station_name`, `briefing_date`, `cr_number`, `fir_number`, `type`, `accused`, `status`, `next_hearing`, `priority`, `remarks`
+
+7. `repeat_offenders` (High-Risk Offenders):
+   - `name`, `alias`, `age`, `address`, `risk_level`, `total_cases`, `last_seen`, `remarks`
+
+Other accessible operational tables: `accused`, `victim`, `complainantdetails`, `chargesheetdetails`, `act`, `section`, `arrestsurrender`.
 """
 
 db_agent = Agent(
@@ -91,27 +88,21 @@ db_agent = Agent(
 
 def get_registered_datasets():
     """Fetch enabled datasets from the Authorization database."""
-    log_reasoning_step("Querying Supabase PostgreSQL auth registry for custom datasets...")
     datasets = []
     try:
         with get_auth_db_connection() as conn:
-            log_reasoning_step("Connected to authorization database. Fetching custom dataset registry...")
             with conn.cursor() as cur:
                 cur.execute("SELECT table_name, description FROM ai_dataset_registry WHERE is_enabled = 1;")
                 datasets = cur.fetchall()
         if datasets:
             table_names = ", ".join([f"'{d['table_name']}'" for d in datasets])
-            log_reasoning_step(f"Authorized custom datasets retrieved from registry: {table_names}")
-        else:
-            log_reasoning_step("No additional custom datasets are currently registered or enabled.")
+            logger.info(f"Authorized custom datasets retrieved: {table_names}")
     except Exception as e:
         logger.error(f"Error fetching registered datasets: {e}")
-        log_reasoning_step(f"Failed to query dataset registry: {str(e)}")
     return datasets
 
 def get_table_schema(table_name: str) -> str:
     """Fetch column schema for a given table from the Operational database."""
-    log_reasoning_step(f"Retrieving schema definition for table '{table_name}' from PostgreSQL Information Schema...")
     columns_info = []
     try:
         with get_db_connection() as conn:
@@ -125,65 +116,48 @@ def get_table_schema(table_name: str) -> str:
                 columns_info = cur.fetchall()
     except Exception as e:
         logger.error(f"Error fetching schema for {table_name}: {e}")
-        log_reasoning_step(f"Failed to fetch schema for table '{table_name}': {str(e)}")
     
     if not columns_info:
-        log_reasoning_step(f"Failed to retrieve columns for '{table_name}' from Information Schema.")
         return f"   (Columns in `{table_name}` table could not be retrieved.)\n"
     
     schema_str = f"   Columns in `{table_name}` table:\n"
     for col in columns_info:
         schema_str += f"     - `{col['column_name']}` ({col['data_type']})\n"
-    log_reasoning_step(f"Loaded schema for '{table_name}' with {len(columns_info)} columns.")
     return schema_str
 
 @db_agent.system_prompt
 def build_system_prompt() -> str:
-    log_reasoning_step("Initiating system prompt construction...")
-    # Get registered datasets
     datasets = get_registered_datasets()
-    
-    # Base instructions and views
     prompt = BASE_SYSTEM_PROMPT
     
-    # If there are registered datasets, add them to the prompt
     if datasets:
-        prompt += "\nIn addition to the three standard views, you are also authorized and encouraged to query the following registered operational datasets:\n\n"
+        prompt += "\nIn addition to standard tables, you are also authorized to query the following registered operational datasets:\n\n"
         for d in datasets:
             table_name = d["table_name"]
             description = d["description"] or "No description provided."
             prompt += f"Table: `{table_name}`\n"
             prompt += f"Description: {description}\n"
-            # Get table schema
             prompt += get_table_schema(table_name)
             prompt += "\n"
-    else:
-        prompt += "\nNo additional custom datasets are currently registered.\n"
 
-    # Add standard rules of engagement
     prompt += """
 RULES OF ENGAGEMENT:
-1. You MUST call the `execute_select_query` tool to retrieve data from the database before answering. Do NOT output a query in text and say you will run it—you must invoke the tool.
-2. Formulate standard PostgreSQL queries against the VIEWS or registered tables. For example:
+1. You MUST call the `execute_select_query` tool to retrieve data from the database before answering any data question. Do NOT output a query in text without executing it.
+2. For greetings or non-data questions (like "Hello", "Hi", "Thank you"), respond naturally WITHOUT calling any tools.
+3. Formulate standard PostgreSQL queries against tables or views. For example:
    * To find cases for Ravi: `SELECT * FROM active_cases WHERE accused ILIKE '%ravi%';`
+   * To search casemaster: `SELECT c.casemasterid, c.crimeno, c.brieffacts, ch.crimegroupname FROM casemaster c LEFT JOIN crimehead ch ON c.crimemajorheadid = ch.crimeheadid LIMIT 20;`
    * To list repeat offenders: `SELECT name, alias, risk_level FROM repeat_offenders;`
-   * To list overnight incidents: `SELECT * FROM overnight_incidents;`
-   * To list all unique crimes/crime types alphabetically: `SELECT DISTINCT type FROM active_cases UNION SELECT DISTINCT type FROM overnight_incidents ORDER BY type ASC;`
-3. Present your findings in a clean markdown table.
-4. If no matching records are returned, output: "No records found matching your query."
-5. You are strictly allowed to run only read-only SELECT or WITH statements.
-6. If the user asks for a brief, summary, or general description of the database or what is in it, you must still query the database first (for example, by selecting counts from the views, such as `SELECT count(*) FROM overnight_incidents;` or similar) to ground your answer before giving the overview.
-7. If the tool returns an error, use the error details to formulate a corrected SQL query and execute it again.
+   * To count incidents: `SELECT count(*) FROM overnight_incidents;`
+4. Present findings in a clear markdown table or bullet points.
+5. If no matching records are returned, output: "No records found matching your query."
+6. You are strictly allowed to run read-only SELECT or WITH statements.
+7. If the user asks for a brief, summary, or general description of cases, query counts or sample rows first before giving the overview.
+8. If a query returns an error, use the error details to formulate a corrected SQL query and execute it again.
+9. You are authorized to query ANY table or view in the dataset (casemaster, active_cases, overnight_incidents, repeat_offenders, crimehead, unit, casestatusmaster, accused, victim, etc.).
+10. For analytical requests, use PostgreSQL aggregations (`COUNT()`, `GROUP BY`, `ORDER BY`).
+11. To link tables, perform standard SQL JOINs on foreign keys or matching text columns.
 """
-    # Dynamically build Rule 8 based on allowed tables
-    allowed_tables_list = ["overnight_incidents", "active_cases", "repeat_offenders"] + [d["table_name"] for d in datasets]
-    allowed_tables_str = ", ".join([f"'{t}'" for t in allowed_tables_list])
-    prompt += f"\n8. You are ONLY allowed to query the views or registered tables: {allowed_tables_str}. You must NEVER query any other table or view (e.g. do NOT query 'trials_data', 'criminals', 'officers', etc.). If you need details about repeat offenders or age, you must select them from the 'repeat_offenders' view.\n"
-
-    prompt += """9. For complex analytical requests (e.g. counting total incidents, calculating average workloads, or grouping cases by priority/status), you must formulate accurate PostgreSQL aggregation statements using `COUNT()`, `GROUP BY`, and `ORDER BY` to compute exact figures.
-10. To link entities across tables (such as matching repeat offenders to active cases), perform standard SQL JOINs matching unique keys (e.g., `fir_number`) or use fuzzy string matching on text columns (e.g., `active_cases.accused ILIKE '%' || repeat_offenders.name || '%'`).
-"""
-    log_reasoning_step("Dynamically constructed system prompt with views, tables, and rules of engagement.")
     return prompt
 
 import contextvars
@@ -224,43 +198,46 @@ def execute_select_query(sql: str = "", **kwargs) -> str:
         str: A string representation of the rows returned or an error message.
     """
     query = sql
-    if not query and 'object' in kwargs and isinstance(kwargs['object'], dict) and 'sql' in kwargs['object']:
-        query = kwargs['object']['sql']
+    if not query and 'query' in kwargs:
+        query = str(kwargs['query'])
+    if not query and 'object' in kwargs and isinstance(kwargs['object'], dict):
+        query = kwargs['object'].get('sql') or kwargs['object'].get('query') or ''
         
     if query:
+        # Strip leading variable names like query= or sql= or query:
+        query = re.sub(r"^(?:query|sql)\s*[:=]\s*", "", query, flags=re.IGNORECASE).strip()
+        # Strip outer quotes wrapping the query
+        if (query.startswith('"') and query.endswith('"')) or (query.startswith("'") and query.endswith("'")):
+            query = query[1:-1].strip()
         # Strip XML-like tags and markdown code blocks that the LLM may wrap the query in
         query = re.sub(r"</?(?:sql|query|tool_code|execute_select_query)?>", "", query).strip()
         query = re.sub(r"```[a-zA-Z]*", "", query).strip()
         
     if not query:
         logger.warning(f"Received empty query request with arguments: sql={sql}, kwargs={kwargs}")
-        log_reasoning_step("Execution halted: Missing SQL query string.")
         return "ERROR: Missing query statement. Please supply a valid read-only SQL SELECT query."
 
-    log_reasoning_step("Tool invoked: Parsing and validation of SQL statement...")
-    log_reasoning_step(f"Formulated SQL query: {query}")
+    log_reasoning_step(f"Executing SQL: {query}")
     log_sql_query(query)
     
     if not check_query_is_safe(query):
         logger.warning(f"Rejected unsafe query request: {query}")
         return "ERROR: Unsafe query rejected. Only read-only SELECT and WITH statements are allowed."
         
-    log_reasoning_step("Establishing pool connection to Supabase PostgreSQL operational database...")
     try:
+        import json
         with get_db_connection() as conn:
-            log_reasoning_step("Connection established. Dispatching query execution...")
             with conn.cursor() as cur:
                 cur.execute(query)
                 rows = cur.fetchall()
                 logger.info(f"SQL execution returned {len(rows)} rows.")
                 if not rows:
-                    log_reasoning_step("Database query execution finished. Returned 0 matches.")
+                    log_reasoning_step("Query returned 0 results.")
                     return "Query returned 0 rows."
-                log_reasoning_step(f"Database query executed successfully. Retrieved {len(rows)} records.")
-                # Formats results as a list of dicts string representation
-                return str(rows)
+                log_reasoning_step(f"Retrieved {len(rows)} records from database.")
+                return json.dumps(rows, default=str, indent=2)
     except Exception as e:
         logger.error(f"SQL execution error: {e}")
-        log_reasoning_step(f"Database execution failed with error: {str(e)}")
+        log_reasoning_step(f"Query error: {str(e)}")
         return f"Database Error: {str(e)}"
 

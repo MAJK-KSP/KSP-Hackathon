@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 
 interface Message {
@@ -68,9 +69,33 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
   const [speechLanguage, setSpeechLanguage] = useState<'en' | 'hi' | 'kn'>('en');
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
 
+  // TTS Synthesis states
+  const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
+  const [ttsLoadingMessageId, setTtsLoadingMessageId] = useState<string | null>(null);
+  const [ttsEmotion, setTtsEmotion] = useState<'neutral' | 'happy' | 'sad' | 'angry'>('neutral');
+  const [ttsSpeaker, setTtsSpeaker] = useState<string>('female');
+  const [showTtsModal, setShowTtsModal] = useState<boolean>(false);
+  const [ttsCustomText, setTtsCustomText] = useState<string>('Karnataka State Police operational intelligence platform is active.');
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const speechRecognitionRef = useRef<any>(null);
+
+  const location = useLocation();
+
+  // Read ?query= search parameter from URL if redirected from GIS Map or elsewhere
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const initialQuery = params.get('query');
+    if (initialQuery && initialQuery.trim()) {
+      setInput(initialQuery.trim());
+      if (isFullPage) {
+        setIsOpen(true);
+      }
+    }
+  }, [location.search, isFullPage]);
 
   // Sync speechLanguage with user's selected locale
   useEffect(() => {
@@ -85,6 +110,9 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (speechRecognitionRef.current) {
+        try { speechRecognitionRef.current.stop(); } catch (e) {}
+      }
     };
   }, []);
 
@@ -102,6 +130,38 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
 
     setTranscriptionError(null);
 
+    let liveCapturedText = false;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        const langMap: Record<string, string> = { en: 'en-IN', hi: 'hi-IN', kn: 'kn-IN' };
+        recognition.lang = langMap[speechLanguage] || 'en-IN';
+
+        recognition.onresult = (event: any) => {
+          let liveTranscript = '';
+          for (let i = 0; i < event.results.length; i++) {
+            liveTranscript += event.results[i][0].transcript;
+          }
+          if (liveTranscript.trim()) {
+            liveCapturedText = true;
+            setInput(liveTranscript.trim());
+          }
+        };
+
+        recognition.onerror = (event: any) => {
+          console.warn('Live SpeechRecognition notice:', event.error);
+        };
+
+        recognition.start();
+        speechRecognitionRef.current = recognition;
+      } catch (e) {
+        console.warn('Live SpeechRecognition initialization notice:', e);
+      }
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -116,6 +176,11 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
 
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(track => track.stop());
+        // If real-time Web Speech API already typed text into the input bar, skip the slow server transcription!
+        if (liveCapturedText || (inputRef.current && inputRef.current.value.trim().length > 0)) {
+          console.log('[Voice] Real-time speech captured. Skipping secondary server transcription delay.');
+          return;
+        }
         const mimeType = mediaRecorder.mimeType || 'audio/wav';
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         if (audioChunksRef.current.length > 0 && audioBlob.size > 0) {
@@ -145,6 +210,10 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
   };
 
   const stopRecording = () => {
+    if (speechRecognitionRef.current) {
+      try { speechRecognitionRef.current.stop(); } catch (e) {}
+      speechRecognitionRef.current = null;
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
@@ -156,6 +225,10 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
   };
 
   const cancelRecording = () => {
+    if (speechRecognitionRef.current) {
+      try { speechRecognitionRef.current.stop(); } catch (e) {}
+      speechRecognitionRef.current = null;
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       audioChunksRef.current = [];
       mediaRecorderRef.current.stop();
@@ -234,6 +307,223 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
       console.error('Failed to read audio blob:', err);
       setTranscriptionError(t('Failed to process recorded audio.'));
       setTranscribing(false);
+    }
+  };
+
+  // Kannada Translation + TTS state
+  const [kannadaPlayingId, setKannadaPlayingId] = useState<string | null>(null);
+  const [kannadaLoadingId, setKannadaLoadingId] = useState<string | null>(null);
+
+  const translateAndPlayKannada = async (msgId: string, textToSpeak: string) => {
+    // Toggle off if already playing
+    if (kannadaPlayingId === msgId || kannadaLoadingId === msgId) {
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      setKannadaPlayingId(null);
+      setKannadaLoadingId(null);
+      return;
+    }
+
+    // Stop any existing playback
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      audioElementRef.current = null;
+    }
+    setPlayingMessageId(null);
+    setKannadaPlayingId(null);
+
+    const cleanText = textToSpeak.replace(/[*_#`~>|-]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!cleanText) return;
+
+    setKannadaLoadingId(msgId);
+
+    try {
+      // Use MyMemory free translation API (no API key required)
+      const textChunk = cleanText.substring(0, 500); // API limit
+      const res = await fetch(
+        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(textChunk)}&langpair=en|kn`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+
+      if (!res.ok) throw new Error('Translation API failed');
+
+      const data = await res.json();
+      const kannadaText = data?.responseData?.translatedText || textChunk;
+
+      if (!('speechSynthesis' in window)) {
+        setKannadaLoadingId(null);
+        return;
+      }
+
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.resume();
+
+      const utterance = new SpeechSynthesisUtterance(kannadaText);
+      utterance.lang = 'kn-IN';
+      utterance.rate = 0.9;
+
+      // Try to find a Kannada voice
+      const voices = window.speechSynthesis.getVoices();
+      const knVoice = voices.find(v => v.lang.startsWith('kn'));
+      if (knVoice) utterance.voice = knVoice;
+
+      utterance.onend = () => {
+        setKannadaPlayingId(null);
+        setKannadaLoadingId(null);
+      };
+      utterance.onerror = () => {
+        setKannadaPlayingId(null);
+        setKannadaLoadingId(null);
+      };
+
+      setKannadaLoadingId(null);
+      setKannadaPlayingId(msgId);
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.warn('Kannada TTS error:', err);
+      setKannadaLoadingId(null);
+      setKannadaPlayingId(null);
+    }
+  };
+
+  const synthesizeAndPlay = async (msgId: string, textToSpeak: string) => {
+    // 1. If currently playing or loading this message, stop immediately
+    if (playingMessageId === msgId || ttsLoadingMessageId === msgId) {
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+        audioElementRef.current = null;
+      }
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      setPlayingMessageId(null);
+      setTtsLoadingMessageId(null);
+      return;
+    }
+
+    // 2. Stop any existing playback
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      audioElementRef.current = null;
+    }
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.resume();
+    }
+    setPlayingMessageId(null);
+
+    const cleanText = textToSpeak.replace(/[*_#`~>|-]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!cleanText) return;
+
+    // Fast native SpeechSynthesis player
+    const playFallbackSpeech = () => {
+      setTtsLoadingMessageId(null);
+      if (!('speechSynthesis' in window)) {
+        setPlayingMessageId(null);
+        return;
+      }
+
+      try {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.resume();
+
+        const utterance = new SpeechSynthesisUtterance(cleanText.substring(0, 1500));
+        const langMap: Record<string, string> = { en: 'en-IN', hi: 'hi-IN', kn: 'kn-IN' };
+        utterance.lang = langMap[speechLanguage] || 'en-IN';
+
+        const voices = window.speechSynthesis.getVoices();
+        const matchedVoice = voices.find(v => v.lang.startsWith(utterance.lang) || v.lang.startsWith(speechLanguage));
+        if (matchedVoice) {
+          utterance.voice = matchedVoice;
+        }
+
+        utterance.onend = () => {
+          setPlayingMessageId(null);
+          setTtsLoadingMessageId(null);
+        };
+        utterance.onerror = () => {
+          setPlayingMessageId(null);
+          setTtsLoadingMessageId(null);
+        };
+
+        setPlayingMessageId(msgId);
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {
+        console.warn('Native speech error:', e);
+        setPlayingMessageId(null);
+        setTtsLoadingMessageId(null);
+      }
+    };
+
+    setTtsLoadingMessageId(msgId);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000); // 4-second timeout limit
+
+    try {
+      const langMap: Record<string, string> = { en: 'English', hi: 'Hindi', kn: 'Kannada' };
+      const selectedLang = langMap[speechLanguage] || 'English';
+
+      const res = await fetch('/api/ai/synthesize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: cleanText.substring(0, 800),
+          language: selectedLang,
+          speaker: ttsSpeaker,
+          emotion: ttsEmotion
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        playFallbackSpeech();
+        return;
+      }
+
+      const contentType = res.headers.get('content-type') || '';
+      let audioUrl = '';
+
+      if (contentType.includes('application/json')) {
+        const data = await res.json();
+        if (data.success && data.audio_base64) {
+          audioUrl = `data:audio/wav;base64,${data.audio_base64}`;
+        } else {
+          playFallbackSpeech();
+          return;
+        }
+      } else {
+        const blob = await res.blob();
+        if (blob.size === 0) {
+          playFallbackSpeech();
+          return;
+        }
+        audioUrl = URL.createObjectURL(blob);
+      }
+
+      const audio = new Audio(audioUrl);
+      audioElementRef.current = audio;
+      setTtsLoadingMessageId(null);
+      setPlayingMessageId(msgId);
+
+      audio.onended = () => {
+        setPlayingMessageId(null);
+        audioElementRef.current = null;
+      };
+      audio.onerror = () => {
+        setPlayingMessageId(null);
+        audioElementRef.current = null;
+        playFallbackSpeech();
+      };
+
+      await audio.play();
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      playFallbackSpeech();
+    } finally {
+      setTtsLoadingMessageId(null);
     }
   };
 
@@ -798,7 +1088,7 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
       )}
 
       {/* Chat Panel */}
-      {isOpen && (
+      {(isFullPage || isOpen) && (
         <div className={`ai-chat-panel ${isFullPage ? 'full-page' : ''}`}>
           {isFullPage ? (
             <div className="ai-chat-fullpage-layout">
@@ -944,6 +1234,34 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
                         ) : (
                           <>
                             <div className="ai-msg-content">{parseMarkdown(msg.content)}</div>
+                            {msg.role === 'assistant' && !msg.is_generating && (
+                              <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <button
+                                  className={`ai-tts-listen-btn ${playingMessageId === msg.id ? 'playing' : ''}`}
+                                  onClick={() => synthesizeAndPlay(msg.id, msg.content)}
+                                >
+                                  {ttsLoadingMessageId === msg.id ? (
+                                    <>⌛ {t('Synthesizing Zia TTS...')}</>
+                                  ) : playingMessageId === msg.id ? (
+                                    <>⏹️ {t('Stop Voice')}</>
+                                  ) : (
+                                    <>🔊 {t('Listen (Zia TTS)')}</>
+                                  )}
+                                </button>
+                                <button
+                                  className={`ai-tts-listen-btn kannada-btn ${kannadaPlayingId === msg.id ? 'playing' : ''}`}
+                                  onClick={() => translateAndPlayKannada(msg.id, msg.content)}
+                                >
+                                  {kannadaLoadingId === msg.id ? (
+                                    <>⌛ {t('Translating to ಕನ್ನಡ...')}</>
+                                  ) : kannadaPlayingId === msg.id ? (
+                                    <>⏹️ {t('Stop ಕನ್ನಡ')}</>
+                                  ) : (
+                                    <>🗣️ {t('ಕನ್ನಡದಲ್ಲಿ ಕೇಳಿ')}</>
+                                  )}
+                                </button>
+                              </div>
+                            )}
                             {msg.role === 'assistant' && msg.metadata && (msg.metadata.sql_queries?.length || msg.metadata.reasoning_steps?.length) ? (
                               <details className="ai-evidence-accordion">
                                 <summary className="ai-evidence-header">
@@ -1027,6 +1345,14 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
                   </div>
                 </div>
                 <div className="ai-chat-header-actions">
+                  <button
+                    className="ai-header-btn"
+                    onClick={() => setShowTtsModal(true)}
+                    title={t('Test Zia TTS Voice')}
+                    style={{ fontSize: '0.8rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    🔊 {t('Voice TTS')}
+                  </button>
                   {activeConversationId && (
                     <button
                       className="ai-header-btn"
@@ -1166,6 +1492,34 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
                       ) : (
                         <>
                           <div className="ai-msg-content">{parseMarkdown(msg.content)}</div>
+                          {msg.role === 'assistant' && !msg.is_generating && (
+                            <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <button
+                                className={`ai-tts-listen-btn ${playingMessageId === msg.id ? 'playing' : ''}`}
+                                onClick={() => synthesizeAndPlay(msg.id, msg.content)}
+                              >
+                                {ttsLoadingMessageId === msg.id ? (
+                                  <>⌛ {t('Synthesizing Zia TTS...')}</>
+                                ) : playingMessageId === msg.id ? (
+                                  <>⏹️ {t('Stop Voice')}</>
+                                ) : (
+                                  <>🔊 {t('Listen (Zia TTS)')}</>
+                                )}
+                              </button>
+                              <button
+                                className={`ai-tts-listen-btn kannada-btn ${kannadaPlayingId === msg.id ? 'playing' : ''}`}
+                                onClick={() => translateAndPlayKannada(msg.id, msg.content)}
+                              >
+                                {kannadaLoadingId === msg.id ? (
+                                  <>⌛ {t('Translating to ಕನ್ನಡ...')}</>
+                                ) : kannadaPlayingId === msg.id ? (
+                                  <>⏹️ {t('Stop ಕನ್ನಡ')}</>
+                                ) : (
+                                  <>🗣️ {t('ಕನ್ನಡದಲ್ಲಿ ಕೇಳಿ')}</>
+                                )}
+                              </button>
+                            </div>
+                          )}
                           {msg.role === 'assistant' && msg.metadata && (msg.metadata.sql_queries?.length || msg.metadata.reasoning_steps?.length) ? (
                             <details className="ai-evidence-accordion">
                               <summary className="ai-evidence-header">
@@ -1260,6 +1614,107 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
                 }}
               >
                 {t('Confirm & Download')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Zoho Catalyst Zia TTS Testing Modal */}
+      {showTtsModal && (
+        <div className="ai-modal-backdrop" onClick={() => setShowTtsModal(false)}>
+          <div className="ai-preview-modal" style={{ maxWidth: '520px' }} onClick={e => e.stopPropagation()}>
+            <div className="ai-modal-header">
+              <h3>🔊 {t('Zoho Catalyst Zia Text-to-Audio Synthesis')}</h3>
+              <button className="ai-modal-close" onClick={() => setShowTtsModal(false)} title={t('Close Modal')}>
+                ×
+              </button>
+            </div>
+            <div className="ai-modal-body" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ fontSize: '0.825rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+                  {t('Input Text to Synthesize:')}
+                </label>
+                <textarea
+                  value={ttsCustomText}
+                  onChange={e => setTtsCustomText(e.target.value)}
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.875rem',
+                    fontFamily: 'inherit'
+                  }}
+                  placeholder={t('Type text to speak...')}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    {t('Language')}
+                  </label>
+                  <select
+                    value={speechLanguage}
+                    onChange={e => setSpeechLanguage(e.target.value as any)}
+                    style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  >
+                    <option value="en">English</option>
+                    <option value="hi">Hindi (हिंदी)</option>
+                    <option value="kn">Kannada (ಕನ್ನಡ)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    {t('Speaker')}
+                  </label>
+                  <select
+                    value={ttsSpeaker}
+                    onChange={e => setTtsSpeaker(e.target.value)}
+                    style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  >
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    {t('Emotion')}
+                  </label>
+                  <select
+                    value={ttsEmotion}
+                    onChange={e => setTtsEmotion(e.target.value as any)}
+                    style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  >
+                    <option value="neutral">Neutral</option>
+                    <option value="happy">Happy</option>
+                    <option value="sad">Sad</option>
+                    <option value="angry">Angry</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="ai-modal-footer">
+              <button className="ai-btn-secondary" onClick={() => setShowTtsModal(false)}>
+                {t('Close')}
+              </button>
+              <button
+                className="ai-btn-primary"
+                disabled={!ttsCustomText.trim() || ttsLoadingMessageId === 'test-modal'}
+                onClick={() => synthesizeAndPlay('test-modal', ttsCustomText)}
+                style={{ backgroundColor: playingMessageId === 'test-modal' ? '#ef4444' : '#2563eb' }}
+              >
+                {ttsLoadingMessageId === 'test-modal' ? (
+                  <>⌛ {t('Synthesizing...')}</>
+                ) : playingMessageId === 'test-modal' ? (
+                  <>⏹️ {t('Stop Playback')}</>
+                ) : (
+                  <>🔊 {t('Play Audio')}</>
+                )}
               </button>
             </div>
           </div>

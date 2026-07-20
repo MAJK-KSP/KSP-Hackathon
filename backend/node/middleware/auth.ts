@@ -25,9 +25,9 @@ export const securityHeaders = (
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; " +
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com translate.googleapis.com; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com translate.googleapis.com https://unpkg.com; " +
     "font-src 'self' https://fonts.gstatic.com; " +
-    "img-src 'self' data: translate.google.com translate.googleapis.com www.google.com www.google.co.in; " +
+    "img-src 'self' data: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://cdnjs.cloudflare.com translate.google.com translate.googleapis.com www.google.com www.google.co.in; " +
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' translate.google.com translate.googleapis.com; " +
     "connect-src 'self' translate.googleapis.com; " +
     "frame-src 'self' translate.google.com; " +
