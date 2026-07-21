@@ -428,6 +428,38 @@ app.get('/api/daily-brief', authenticateSession, async (req: AuthenticatedReques
   }
 });
 
+// Network Analysis (Proxy to Python Backend)
+app.get('/api/network/analyze', authenticateSession, async (req: AuthenticatedRequest, res) => {
+  try {
+    const pythonBackendUrl = getPythonUrl('/api/network/analyze');
+    const response = await fetch(pythonBackendUrl);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorJson;
+      try {
+        errorJson = JSON.parse(errorText);
+      } catch {
+        errorJson = null;
+      }
+      return res.status(response.status).json({ 
+        error: errorJson?.detail || errorJson?.error || errorText || 'Failed to fetch network analysis from backend' 
+      });
+    }
+    
+    const data = await response.json();
+    return res.status(200).json(data);
+  } catch (error: any) {
+    console.error('Error fetching network analysis:', error);
+    if (error.code === 'ECONNREFUSED' || error.message?.includes('fetch failed')) {
+      return res.status(503).json({
+        error: 'Intelligence backend service is offline.'
+      });
+    }
+    return res.status(500).json({ error: 'Internal server error fetching network analysis' });
+  }
+});
+
 // 10. System Status Diagnostics
 app.get('/api/system/status', authenticateSession, async (req: AuthenticatedRequest, res) => {
   try {

@@ -3,7 +3,7 @@ Zoho QuickML LLM Client — Thin, reusable wrapper for Zoho QuickML integrations
 """
 
 from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from config import settings
@@ -277,12 +277,12 @@ class ZohoQuickMLTransport(httpx.AsyncHTTPTransport):
         return response
 
 
-def get_quickml_model() -> OpenAIModel:
+def get_quickml_model() -> OpenAIChatModel:
     """
     Create and return an OpenAIModel instance configured to route requests through Zoho QuickML.
     """
     client = httpx.AsyncClient(transport=ZohoQuickMLTransport())
-    return OpenAIModel(
+    return OpenAIChatModel(
         model_name="VL-Qwen3.6-35B-A3B",
         provider=OpenAIProvider(base_url="https://api.catalyst.zoho.in", api_key="placeholder", http_client=client),
     )

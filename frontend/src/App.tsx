@@ -22,6 +22,7 @@ interface User {
 
 import { UserManagement } from './components/UserManagement';
 import { GisMap } from './components/GisMap';
+import { NetworkAnalysis } from './components/NetworkAnalysis';
 
 // Inner component to access router hooks
 const AppContent: React.FC = () => {
@@ -103,6 +104,7 @@ const AppContent: React.FC = () => {
         <Route path="/security" element={<Security user={user} onMfaEnabled={checkSession} />} />
         <Route path="/users" element={<UserManagement />} />
         <Route path="/map" element={<GisMap />} />
+        <Route path="/network" element={<NetworkAnalysis />} />
         <Route path="/chat" element={<AiChat isFullPage={true} />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

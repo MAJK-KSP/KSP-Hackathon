@@ -9,16 +9,18 @@
     "build:server": "tsc -p backend/node/tsconfig.json",
     "start": "node dist/server.js",
     "dev": "concurrently \"nodemon --watch backend/node --ext ts,js --exec ts-node backend/node/server.ts\" \"vite frontend\" \"npm run dev:backend\"",
-    "dev:backend": "cd backend/python && ..\\..\\.venv\\Scripts\\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload"
+    "dev:backend": "cd backend/python && .\\venv\\Scripts\\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",
+    "@types/d3-force": "^3.0.10",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
+    "d3-force": "^3.0.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-rate-limit": "^7.3.1",
@@ -29,6 +31,8 @@
     "qrcode": "^1.5.3",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "react-force-graph-2d": "^1.29.1",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.1",
     "uuid": "^10.0.0",
     "zod": "^3.23.8"

@@ -11,6 +11,7 @@ from config import settings
 from routes.briefing import router as briefing_router
 from routes.transcribe import router as transcribe_router
 from routes.synthesize import router as synthesize_router
+from routes.network_routes import router as network_router
 from services.db import init_db
 
 
@@ -39,8 +40,12 @@ app = FastAPI(
 
 @app.on_event("startup")
 def startup_event():
-    """Run database initialization on startup."""
+    """Run database initialization and start scheduler on startup."""
     init_db()
+    
+    # Start background job scheduler
+    from services.scheduler_service import start_scheduler
+    start_scheduler()
 
 
 
@@ -65,6 +70,7 @@ app.add_middleware(
 app.include_router(briefing_router)
 app.include_router(transcribe_router)
 app.include_router(synthesize_router)
+app.include_router(network_router)
 
 
 # ---------------------------------------------------------------------------
