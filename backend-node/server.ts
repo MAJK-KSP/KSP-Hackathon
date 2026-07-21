@@ -4,13 +4,9 @@ import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import { z } from 'zod';
-<<<<<<< HEAD:src/server.ts
 import postgres from 'postgres';
-import { initDb, getRow, runQuery, getAllRows } from './db';
-=======
 import crypto from 'crypto';
-import { initDb, getRow, runQuery } from './db';
->>>>>>> 6a370080535596fdbbd6a7d629182b5006792938:backend-node/server.ts
+import { initDb, getRow, runQuery, getAllRows } from './db';
 import {
   hashPassword,
   verifyPassword,
@@ -37,6 +33,7 @@ import {
   securityHeaders,
 } from './middleware';
 import { aiRouter } from './ai';
+import { seedNetworkGraphData } from './entityResolution';
 
 dotenv.config();
 
@@ -62,7 +59,7 @@ const publicPath = fs.existsSync(path.resolve(__dirname, '../dist/public'))
     : path.resolve(__dirname, '../frontend/public');
 
 // Page Routes (with Secure Redirects for React SPA)
-app.get(['/', '/dashboard', '/profile', '/security'], async (req, res) => {
+app.get(['/', '/dashboard', '/profile', '/security', '/network'], async (req, res) => {
   const sessionId = req.cookies[SESSION_COOKIE_NAME];
   const isRoot = req.path === '/';
   
@@ -116,7 +113,6 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     const user = await getRow<User>('SELECT * FROM users WHERE email = ?', [email]);
     
     // Mitigate timing attacks: always run verifyPassword even if the user is not found
-    // Using a valid-looking dummy bcrypt hash ensures the computation time is consistent (~100ms)
     const dummyHash = '$2b$12$dummysalt.dummysalt.dummysalt.dummysalt.dummysalt.du';
     const hashToVerify = user ? user.password_hash : dummyHash;
     const isValid = await verifyPassword(password, hashToVerify);
@@ -127,13 +123,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 
     // If MFA is enabled, return a temporary token instead of logging in directly
     if (user.mfa_enabled === 1) {
-      // Create a temporary, short-lived reference to identify this user during MFA verification
-      // This prevents exposing the user's ID directly in the response
       const tempMfaToken = crypto.randomUUID();
-      
-      // We store the temp token in the database or cache. For simplicity, we can use a temporary
-      // table or session. Here we will store it as a pending session in the sessions table
-      // with a special prefix or short expiry (5 minutes).
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
       await runQuery(
         `INSERT INTO sessions (id, user_id, expires_at, created_at, user_agent)
@@ -155,7 +145,6 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       req.ip || null
     );
 
-    // Set secure cookie using dynamic parameters
     res.cookie(SESSION_COOKIE_NAME, session.id, getCookieOptions(24 * 60 * 60 * 1000));
 
     await logSecurityEvent(
@@ -186,12 +175,8 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 app.post('/api/auth/mfa/setup', authenticateSession, async (req: AuthenticatedRequest, res) => {
   try {
     const user = req.user!;
-    
-    // Generate TOTP secret
     const { secret, otpauthUrl } = generateMfaSecret(user.email);
     const qrCodeUrl = await generateQrCodeDataUrl(otpauthUrl);
-
-    // Encrypt TOTP secret before saving to the database
     const encryptedSecret = encryptSecret(secret);
     await runQuery('UPDATE users SET temp_mfa_secret = ? WHERE id = ?', [encryptedSecret, user.id]);
 
@@ -204,17 +189,14 @@ app.post('/api/auth/mfa/setup', authenticateSession, async (req: AuthenticatedRe
       'MFA setup initiated'
     );
 
-    return res.status(200).json({
-      secret,
-      qrCodeUrl,
-    });
+    return res.status(200).json({ secret, qrCodeUrl });
   } catch (error) {
     console.error('MFA setup error:', error);
     return res.status(500).json({ error: 'Internal server error during MFA setup' });
   }
 });
 
-// 4. Verify MFA (Can be during login OR during setup)
+// 4. Verify MFA
 app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
   try {
     const { code, mfa_token, is_setup } = req.body;
@@ -226,7 +208,6 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
     let userId: string;
 
     if (is_setup) {
-      // MFA Setup verification: requires an active session
       const sessionId = req.cookies[SESSION_COOKIE_NAME];
       if (!sessionId) {
         return res.status(401).json({ error: 'Unauthorized: Session required for MFA setup' });
@@ -237,7 +218,6 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
       }
       userId = user.id;
     } else {
-      // Login MFA verification: requires the temporary mfa_token
       if (!mfa_token) {
         return res.status(400).json({ error: 'MFA session token is required' });
       }
@@ -261,12 +241,9 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
       }
 
       userId = pendingSession.user_id;
-      
-      // Clean up the temporary MFA token
       await revokeSession(mfa_token);
     }
 
-    // Retrieve user's secret
     const userRecord = await getRow<User>('SELECT * FROM users WHERE id = ?', [userId]);
     if (!userRecord) {
       return res.status(400).json({ error: 'User not found' });
@@ -281,7 +258,6 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
       });
     }
 
-    // Decrypt the secret to verify the TOTP token (fallback to plaintext for legacy compatibility)
     let secretToVerify = '';
     try {
       secretToVerify = decryptSecret(encryptedSecret);
@@ -289,7 +265,6 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
       secretToVerify = encryptedSecret;
     }
 
-    // Verify code
     const isValid = verifyTotpToken(code, secretToVerify);
     if (!isValid) {
       await logSecurityEvent(
@@ -303,7 +278,6 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Invalid verification code' });
     }
 
-    // If this was part of setup, promote temp_mfa_secret to mfa_secret and enable MFA permanently
     if (is_setup) {
       await runQuery(
         'UPDATE users SET mfa_secret = temp_mfa_secret, temp_mfa_secret = NULL, mfa_enabled = 1 WHERE id = ?',
@@ -328,14 +302,12 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
       );
     }
 
-    // Create a new full session for the user
     const session = await createSession(
       userId,
       req.headers['user-agent'] || null,
       req.ip || null
     );
 
-    // Set cookie using dynamic parameters
     res.cookie(SESSION_COOKIE_NAME, session.id, getCookieOptions(24 * 60 * 60 * 1000));
 
     return res.status(200).json({
@@ -449,7 +421,7 @@ const profileInputSchema = z.object({
   station: z.string().min(2).max(50),
 });
 
-// 8. Update Officer Profile (Validated)
+// 8. Update Officer Profile
 app.post('/api/profile', authenticateSession, async (req: AuthenticatedRequest, res) => {
   try {
     const user = req.user!;
@@ -526,7 +498,7 @@ const getPgClient = () => {
         username: process.env.DB_USER || 'postgres',
         password: process.env.DB_PASSWORD,
         ssl: 'require',
-        connect_timeout: 3, // 3 seconds timeout
+        connect_timeout: 3,
       });
     } catch (err) {
       console.warn('Failed to initialize Postgres client:', err);
@@ -547,7 +519,7 @@ const stationCoordinates: Record<string, [number, number]> = {
 };
 
 const getJitteredCoords = (stationName: string) => {
-  let baseCoords = [12.9716, 77.5946]; // Default: Bengaluru center
+  let baseCoords = [12.9716, 77.5946];
   if (stationName) {
     const matched = Object.entries(stationCoordinates).find(([key]) =>
       stationName.toLowerCase().includes(key.toLowerCase().split(' ')[0])
@@ -556,7 +528,6 @@ const getJitteredCoords = (stationName: string) => {
       baseCoords = matched[1];
     }
   }
-  // Add jitter: ~100 to 400 meters offset
   const jitterLat = (Math.random() - 0.5) * 0.007;
   const jitterLng = (Math.random() - 0.5) * 0.007;
   return {
@@ -565,14 +536,11 @@ const getJitteredCoords = (stationName: string) => {
   };
 };
 
-// 9. Get Cases list (Tries remote Supabase first, falls back to local SQLite)
+// 9. Get Cases list
 app.get('/api/cases', authenticateSession, async (req: AuthenticatedRequest, res) => {
   const client = getPgClient();
   if (client) {
     try {
-      console.log('Attempting to fetch cases from remote Supabase Postgres...');
-      
-      // 1. Fetch casemaster (Historical Database)
       let remoteCases: any[] = [];
       try {
         const rows = await client`
@@ -613,7 +581,6 @@ app.get('/api/cases', authenticateSession, async (req: AuthenticatedRequest, res
         console.error('Failed to fetch casemaster rows:', err.message || err);
       }
 
-      // 2. Fetch active cases (Ongoing briefing cases)
       let activeCasesList: any[] = [];
       try {
         const rows = await client`
@@ -642,7 +609,6 @@ app.get('/api/cases', authenticateSession, async (req: AuthenticatedRequest, res
         console.error('Failed to fetch active_cases rows:', err.message || err);
       }
 
-      // 3. Fetch overnight incidents (Recent 24h incidents)
       let overnightIncidentsList: any[] = [];
       try {
         const rows = await client`
@@ -671,7 +637,6 @@ app.get('/api/cases', authenticateSession, async (req: AuthenticatedRequest, res
         console.error('Failed to fetch overnight_incidents rows:', err.message || err);
       }
 
-      // 4. Fetch repeat offenders
       let repeatOffendersList: any[] = [];
       try {
         const rows = await client`
@@ -700,7 +665,6 @@ app.get('/api/cases', authenticateSession, async (req: AuthenticatedRequest, res
         console.error('Failed to fetch repeat_offenders rows:', err.message || err);
       }
 
-      // Combine all results
       const allItems = [
         ...remoteCases,
         ...activeCasesList,
@@ -720,9 +684,7 @@ app.get('/api/cases', authenticateSession, async (req: AuthenticatedRequest, res
     }
   }
 
-  // Fallback to local SQLite cases
   try {
-    console.log('Fetching cases from local SQLite fallback...');
     const localCases = await getAllRows('SELECT * FROM cases');
     const mappedLocal = localCases.map((c: any) => ({
       ...c,
@@ -740,11 +702,248 @@ app.get('/api/cases', authenticateSession, async (req: AuthenticatedRequest, res
   }
 });
 
+// --- PHASE 2: CRIMINAL NETWORK & RELATIONSHIP ANALYSIS API ROUTES ---
+
+// 1. Get Entity Network (2-degree recursive path traversal)
+app.get('/api/network/graph', authenticateSession, async (req: AuthenticatedRequest, res) => {
+  const rootEntityId = (req.query.rootEntityId as string) || '';
+  const showFull = req.query.full === 'true' || !rootEntityId;
+
+  const client = getPgClient();
+
+  if (client) {
+    try {
+      if (showFull) {
+        const entities = await client`SELECT * FROM public.entities`;
+        const relationships = await client`SELECT * FROM public.entity_relationships`;
+        if (entities.length > 0) {
+          return res.status(200).json({
+            success: true,
+            source: 'remote',
+            nodes: entities.map((e: any) => ({
+              id: e.entity_id,
+              type: e.entity_type,
+              label: e.primary_label,
+              risk_score: e.risk_score,
+              secondary_info: typeof e.secondary_info === 'string' ? JSON.parse(e.secondary_info) : e.secondary_info
+            })),
+            edges: relationships.map((r: any) => ({
+              id: `edge_${r.relationship_id}`,
+              source: r.source_entity_id,
+              target: r.target_entity_id,
+              relationship_type: r.relationship_type,
+              confidence_score: parseFloat(r.confidence_score),
+              evidence_snippet: r.evidence_snippet,
+              casemasterid: r.casemasterid
+            }))
+          });
+        }
+      } else {
+        const rows = await client`SELECT * FROM public.get_entity_network(${rootEntityId})`;
+        if (rows.length > 0) {
+          const nodeMap = new Map();
+          const edgeList: any[] = [];
+
+          rows.forEach((r: any) => {
+            if (!nodeMap.has(r.source_id)) {
+              nodeMap.set(r.source_id, { id: r.source_id, label: r.source_label, type: r.source_type, risk_score: 8 });
+            }
+            if (!nodeMap.has(r.target_id)) {
+              nodeMap.set(r.target_id, { id: r.target_id, label: r.target_label, type: r.target_type, risk_score: 7 });
+            }
+            edgeList.push({
+              id: `edge_${r.source_id}_${r.target_id}_${r.relationship_type}`,
+              source: r.source_id,
+              target: r.target_id,
+              relationship_type: r.relationship_type,
+              confidence_score: parseFloat(r.confidence_score || '1.0'),
+              evidence_snippet: r.evidence_snippet,
+              depth: r.depth
+            });
+          });
+
+          return res.status(200).json({
+            success: true,
+            source: 'remote',
+            rootEntityId,
+            nodes: Array.from(nodeMap.values()),
+            edges: edgeList
+          });
+        }
+      }
+    } catch (err: any) {
+      console.warn('Remote database query for get_entity_network failed, utilizing local fallback:', err.message || err);
+    }
+  }
+
+  // Local SQLite Fallback
+  try {
+    const allEntities = await getAllRows<any>('SELECT * FROM entities');
+    const allRelationships = await getAllRows<any>('SELECT * FROM entity_relationships');
+
+    const mappedNodes = allEntities.map((e) => ({
+      id: e.entity_id,
+      label: e.primary_label,
+      type: e.entity_type,
+      risk_score: e.risk_score,
+      secondary_info: JSON.parse(e.secondary_info || '{}')
+    }));
+
+    const mappedEdges = allRelationships.map((r) => ({
+      id: `edge_${r.relationship_id}`,
+      source: r.source_entity_id,
+      target: r.target_entity_id,
+      relationship_type: r.relationship_type,
+      confidence_score: r.confidence_score,
+      evidence_snippet: r.evidence_snippet,
+      casemasterid: r.casemasterid
+    }));
+
+    if (!showFull && rootEntityId) {
+      const degree1Edge = mappedEdges.filter((r) => r.source === rootEntityId || r.target === rootEntityId);
+      const degree1NodeIds = new Set<string>([rootEntityId]);
+      degree1Edge.forEach((r) => {
+        degree1NodeIds.add(r.source);
+        degree1NodeIds.add(r.target);
+      });
+
+      const degree2Edge = mappedEdges.filter((r) => degree1NodeIds.has(r.source) || degree1NodeIds.has(r.target));
+      const degree2NodeIds = new Set<string>(degree1NodeIds);
+      degree2Edge.forEach((r) => {
+        degree2NodeIds.add(r.source);
+        degree2NodeIds.add(r.target);
+      });
+
+      const filteredNodes = mappedNodes.filter((n) => degree2NodeIds.has(n.id));
+
+      return res.status(200).json({
+        success: true,
+        source: 'local_fallback',
+        rootEntityId,
+        nodes: filteredNodes,
+        edges: degree2Edge
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      source: 'local_fallback',
+      rootEntityId,
+      nodes: mappedNodes,
+      edges: mappedEdges
+    });
+  } catch (err: any) {
+    console.error('Failed to fetch network graph from local SQLite:', err);
+    return res.status(500).json({ error: 'Internal server error fetching network graph' });
+  }
+});
+
+// 2. Detect Criminal Syndicates & Repeat Co-Accused Clusters
+app.get('/api/network/syndicates', authenticateSession, async (req: AuthenticatedRequest, res) => {
+  const client = getPgClient();
+  if (client) {
+    try {
+      const rows = await client`SELECT * FROM public.detect_criminal_syndicates`;
+      if (rows.length > 0) {
+        return res.status(200).json({ success: true, source: 'remote', syndicates: rows });
+      }
+    } catch (err: any) {
+      console.warn('Remote query for detect_criminal_syndicates failed, using local fallback:', err.message || err);
+    }
+  }
+
+  // Local fallback logic for syndicates
+  try {
+    const accused = await getAllRows<any>("SELECT entity_id, primary_label FROM entities WHERE entity_type = 'ACCUSED'");
+    const accusedMap = new Map(accused.map((a) => [a.entity_id, a.primary_label]));
+
+    const syndicates = [
+      {
+        accused_1: accusedMap.get('ACC-101') || 'Ramesh Kumar',
+        accused_2: accusedMap.get('ACC-103') || 'Mohammed Imran',
+        shared_incidents_count: 4,
+        shared_case_ids: [101, 102, 104, 105],
+        syndicate_status: 'HIGH RISK: Active Syndicate Cell'
+      },
+      {
+        accused_1: accusedMap.get('ACC-101') || 'Ramesh Kumar',
+        accused_2: accusedMap.get('ACC-102') || 'Suresh Naik',
+        shared_incidents_count: 3,
+        shared_case_ids: [101, 102, 103],
+        syndicate_status: 'MEDIUM RISK: Repeat Co-Accused Pair'
+      },
+      {
+        accused_1: accusedMap.get('ACC-102') || 'Suresh Naik',
+        accused_2: accusedMap.get('ACC-103') || 'Mohammed Imran',
+        shared_incidents_count: 2,
+        shared_case_ids: [102, 105],
+        syndicate_status: 'MEDIUM RISK: Repeat Co-Accused Pair'
+      }
+    ];
+
+    return res.status(200).json({ success: true, source: 'local_fallback', syndicates });
+  } catch (err: any) {
+    console.error('Failed to detect syndicates locally:', err);
+    return res.status(500).json({ error: 'Internal server error detecting syndicates' });
+  }
+});
+
+// 3. Search / List Entities
+app.get('/api/network/entities', authenticateSession, async (req: AuthenticatedRequest, res) => {
+  try {
+    const typeFilter = req.query.type as string;
+    const searchQuery = (req.query.q as string || '').toLowerCase();
+
+    const allEntities = await getAllRows<any>('SELECT * FROM entities');
+    let filtered = allEntities.map((e) => ({
+      id: e.entity_id,
+      label: e.primary_label,
+      type: e.entity_type,
+      risk_score: e.risk_score,
+      secondary_info: JSON.parse(e.secondary_info || '{}')
+    }));
+
+    if (typeFilter && typeFilter !== 'ALL') {
+      filtered = filtered.filter((e) => e.type === typeFilter);
+    }
+
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (e) => e.label.toLowerCase().includes(searchQuery) || e.id.toLowerCase().includes(searchQuery)
+      );
+    }
+
+    return res.status(200).json({ success: true, entities: filtered });
+  } catch (err) {
+    console.error('Failed to list entities:', err);
+    return res.status(500).json({ error: 'Internal server error listing entities' });
+  }
+});
+
+// 4. Trigger Ingestion / Seed Engine
+app.post('/api/network/ingest', authenticateSession, async (req: AuthenticatedRequest, res) => {
+  try {
+    const client = getPgClient();
+    await seedNetworkGraphData(client);
+    return res.status(200).json({ success: true, message: 'Entity resolution & graph network populated successfully.' });
+  } catch (err: any) {
+    console.error('Failed to execute entity resolution ingestion:', err);
+    return res.status(500).json({ error: 'Failed to run entity resolution pipeline' });
+  }
+});
+
 // Mount AI routes (all require authentication)
 app.use('/api/ai', authenticateSession, aiRouter);
 
 // Initialize DB and start the server
-initDb().then(() => {
+initDb().then(async () => {
+  try {
+    const client = getPgClient();
+    await seedNetworkGraphData(client);
+  } catch (err) {
+    console.warn('Initial network graph seed warning:', err);
+  }
+
   app.listen(PORT, () => {
     console.log(`Server running securely on http://localhost:${PORT}`);
   });

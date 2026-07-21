@@ -105,7 +105,6 @@ export const initDb = async () => {
     );
   `);
 
-<<<<<<< HEAD:src/db.ts
   // User roles table
   await runQuery(`
     CREATE TABLE IF NOT EXISTS user_roles (
@@ -128,7 +127,11 @@ export const initDb = async () => {
       priority TEXT DEFAULT 'normal',
       effective_date TEXT NOT NULL,
       expires_at TEXT,
-=======
+      created_at TEXT NOT NULL
+    );
+  `);
+  await runQuery(`CREATE INDEX IF NOT EXISTS idx_briefings_date ON daily_briefings(effective_date);`);
+
   // Create security_logs table
   await runQuery(`
     CREATE TABLE IF NOT EXISTS security_logs (
@@ -139,13 +142,10 @@ export const initDb = async () => {
       ip_address TEXT,
       user_agent TEXT,
       details TEXT,
->>>>>>> 6a370080535596fdbbd6a7d629182b5006792938:backend-node/db.ts
       created_at TEXT NOT NULL
     );
   `);
-
-<<<<<<< HEAD:src/db.ts
-  await runQuery(`CREATE INDEX IF NOT EXISTS idx_briefings_date ON daily_briefings(effective_date);`);
+  await runQuery(`CREATE INDEX IF NOT EXISTS idx_security_logs_created_at ON security_logs(created_at);`);
 
   // Chat conversations
   await runQuery(`
@@ -169,7 +169,6 @@ export const initDb = async () => {
       created_at TEXT NOT NULL
     );
   `);
-
   await runQuery(`CREATE INDEX IF NOT EXISTS idx_messages_conversation ON chat_messages(conversation_id, created_at);`);
 
   // AI dataset registry
@@ -199,10 +198,41 @@ export const initDb = async () => {
       status TEXT NOT NULL DEFAULT 'Active'
     );
   `);
-
   await runQuery(`CREATE INDEX IF NOT EXISTS idx_cases_crime_type ON cases(crime_type);`);
   await runQuery(`CREATE INDEX IF NOT EXISTS idx_cases_police_station ON cases(police_station);`);
   await runQuery(`CREATE INDEX IF NOT EXISTS idx_cases_date ON cases(reported_date);`);
+
+  // Phase 2: Entities table (local SQLite fallback)
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS entities (
+      entity_id TEXT PRIMARY KEY,
+      entity_type TEXT NOT NULL,
+      primary_label TEXT NOT NULL,
+      secondary_info TEXT DEFAULT '{}',
+      risk_score INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+  `);
+  await runQuery(`CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(entity_type);`);
+
+  // Phase 2: Entity Relationships table (local SQLite fallback)
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS entity_relationships (
+      relationship_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_entity_id TEXT NOT NULL,
+      target_entity_id TEXT NOT NULL,
+      relationship_type TEXT NOT NULL,
+      casemasterid INTEGER,
+      confidence_score REAL DEFAULT 1.00,
+      evidence_snippet TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (source_entity_id) REFERENCES entities(entity_id) ON DELETE CASCADE,
+      FOREIGN KEY (target_entity_id) REFERENCES entities(entity_id) ON DELETE CASCADE
+    );
+  `);
+  await runQuery(`CREATE INDEX IF NOT EXISTS idx_rel_source ON entity_relationships(source_entity_id);`);
+  await runQuery(`CREATE INDEX IF NOT EXISTS idx_rel_target ON entity_relationships(target_entity_id);`);
+  await runQuery(`CREATE INDEX IF NOT EXISTS idx_rel_case ON entity_relationships(casemasterid);`);
 
   // Seed mock cases if the table is empty
   await seedCases();
@@ -295,12 +325,4 @@ const seedCases = async () => {
   } catch (err) {
     console.error('Failed to seed cases database:', err);
   }
-=======
-  // Index on security_logs created_at for faster lookup and log rotation
-  await runQuery(`
-    CREATE INDEX IF NOT EXISTS idx_security_logs_created_at ON security_logs(created_at);
-  `);
-
-  console.log('Database initialized successfully at:', dbPath);
->>>>>>> 6a370080535596fdbbd6a7d629182b5006792938:backend-node/db.ts
 };
