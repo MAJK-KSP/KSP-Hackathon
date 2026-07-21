@@ -5137,3 +5137,42 @@ body {
   background: var(--ksp-gold-dark);
   color: #ffffff;
 }
+
+.markdown-container {
+  font-family: inherit;
+  line-height: 1.6;
+}
+.markdown-container h1, .markdown-container h2, .markdown-container h3, .markdown-container h4 {
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  color: var(--ksp-navy);
+  font-weight: 700;
+}
+.markdown-container p {
+  margin-bottom: 1rem;
+}
+.markdown-container ul, .markdown-container ol {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+.markdown-container li {
+  margin-bottom: 0.25rem;
+}
+.markdown-container table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+.markdown-container th, .markdown-container td {
+  border: 1px solid #cbd5e1;
+  padding: 8px;
+  text-align: left;
+}
+.markdown-container th {
+  background-color: var(--ksp-navy-bg);
+  font-weight: 700;
+}
+.markdown-container strong {
+  font-weight: 700;
+  color: var(--text-primary);
+}

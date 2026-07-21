@@ -5,6 +5,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../LanguageContext';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface Briefing {
   id: string;
@@ -424,7 +426,11 @@ export const Dashboard: React.FC = () => {
                           <span className="briefing-title">{b.title}</span>
                           <span className={`badge-priority-premium ${b.priority}`}>{t(b.priority.toUpperCase())}</span>
                         </div>
-                        <p className="briefing-body">{b.content}</p>
+                        <div className="briefing-body markdown-container">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {b.content}
+                          </ReactMarkdown>
+                        </div>
                         <div className="briefing-footer">
                           <span>📅 {t("Effective")}: {b.effective_date}</span>
                         </div>

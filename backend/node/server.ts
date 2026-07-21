@@ -10,6 +10,8 @@ import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import { z } from 'zod';
+import crypto from 'crypto';
+import cron from 'node-cron';
 import { initDb, getRow, getAllRows, getAllDatasetRows, runQuery } from './config/db';
 import {
   hashPassword,
@@ -75,7 +77,7 @@ const publicPath = fs.existsSync(path.resolve(__dirname, '../dist/public'))
 app.get(['/', '/dashboard', '/profile', '/security', '/users'], async (req, res) => {
   const sessionId = req.cookies.session_id;
   const isRoot = req.path === '/';
-  
+
   if (sessionId) {
     try {
       const user = await validateSession(sessionId);
@@ -89,11 +91,11 @@ app.get(['/', '/dashboard', '/profile', '/security', '/users'], async (req, res)
       console.error('Error during session validation redirect:', err);
     }
   }
-  
+
   if (!isRoot) {
     return res.redirect('/');
   }
-  
+
   res.sendFile(path.join(publicPath, 'index.html'));
 });
 
@@ -124,7 +126,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 
     // Fetch user
     const user = await getRow<User>('SELECT * FROM users WHERE email = ?', [email]);
-    
+
     // Mitigate timing attacks: always run verifyPassword even if the user is not found
     // Using a valid-looking dummy bcrypt hash ensures the computation time is consistent (~100ms)
     const dummyHash = '$2b$12$dummysalt.dummysalt.dummysalt.dummysalt.dummysalt.du';
@@ -140,7 +142,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       // Create a temporary, short-lived reference to identify this user during MFA verification
       // This prevents exposing the user's ID directly in the response
       const tempMfaToken = crypto.randomUUID();
-      
+
       // We store the temp token in the database or cache. For simplicity, we can use a temporary
       // table or session. Here we will store it as a pending session in the sessions table
       // with a special prefix or short expiry (5 minutes).
@@ -192,7 +194,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 app.post('/api/auth/mfa/setup', authenticateSession, async (req: AuthenticatedRequest, res) => {
   try {
     const user = req.user!;
-    
+
     // Generate TOTP secret
     const { secret, otpauthUrl } = generateMfaSecret(user.email);
     const qrCodeUrl = await generateQrCodeDataUrl(otpauthUrl);
@@ -238,7 +240,7 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
       if (!mfa_token) {
         return res.status(400).json({ error: 'MFA session token is required' });
       }
-      
+
       const pendingSession = await getRow<{ user_id: string; expires_at: string }>(
         `SELECT user_id, expires_at FROM sessions WHERE id = ? AND user_agent = 'mfa_pending'`,
         [mfa_token]
@@ -249,7 +251,7 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
       }
 
       userId = pendingSession.user_id;
-      
+
       // Clean up the temporary MFA token
       await revokeSession(mfa_token);
     }
@@ -347,7 +349,7 @@ app.get('/api/profile', authenticateSession, async (req: AuthenticatedRequest, r
       'SELECT * FROM officer_profiles WHERE user_id = ?',
       [user.id]
     );
-    
+
     if (!profile) {
       profile = {
         user_id: user.id,
@@ -359,7 +361,7 @@ app.get('/api/profile', authenticateSession, async (req: AuthenticatedRequest, r
         station: '',
       };
     }
-    
+
     return res.status(200).json({ success: true, profile });
   } catch (error) {
     console.error('Error fetching profile:', error);
@@ -401,7 +403,7 @@ app.get('/api/daily-brief', authenticateSession, async (req: AuthenticatedReques
   try {
     const pythonBackendUrl = getPythonUrl('/daily-brief');
     const response = await fetch(pythonBackendUrl);
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       let errorJson;
@@ -410,11 +412,11 @@ app.get('/api/daily-brief', authenticateSession, async (req: AuthenticatedReques
       } catch {
         errorJson = null;
       }
-      return res.status(response.status).json({ 
-        error: errorJson?.detail || errorJson?.error || errorText || 'Failed to fetch daily brief from backend' 
+      return res.status(response.status).json({
+        error: errorJson?.detail || errorJson?.error || errorText || 'Failed to fetch daily brief from backend'
       });
     }
-    
+
     const data = await response.json();
     return res.status(200).json(data);
   } catch (error: any) {
@@ -546,7 +548,7 @@ const getJitteredCoords = (stationName: string) => {
 app.get('/api/cases', authenticateSession, async (req: AuthenticatedRequest, res) => {
   try {
     console.log('Attempting to fetch cases from Dataset Supabase DB...');
-    
+
     // 1. Fetch casemaster (Historical Database)
     let remoteCasemaster: any[] = [];
     try {
@@ -734,7 +736,47 @@ app.get('*', (req, res, next) => {
 });
 
 // Initialize DB and start the server
-initDb().catch((err) => {
+initDb().then(() => {
+  // Setup daily briefing cron job at 2:45 PM
+  cron.schedule('57 14 * * *', async () => {
+    console.log('Running scheduled task: Generate Daily Briefing');
+    try {
+      const pythonBackendUrl = getPythonUrl('/daily-brief');
+      const response = await fetch(pythonBackendUrl);
+      if (response.ok) {
+        const data = await response.json();
+        const id = crypto.randomUUID();
+        const now = new Date().toISOString();
+        // Extract a better title if needed, or stick to standard format
+        const title = `Daily Operational Briefing - ${now.split('T')[0]}`;
+
+        let adminRole = await getRow<{ user_id: string }>("SELECT user_id FROM user_roles WHERE role = 'admin' LIMIT 1");
+        let createdBy = adminRole?.user_id;
+
+        if (!createdBy) {
+          const defaultUser = await getRow<{ id: string }>("SELECT id FROM users LIMIT 1");
+          createdBy = defaultUser?.id;
+        }
+
+        if (!createdBy) {
+          console.error('No users found in database to assign as briefing creator.');
+          return;
+        }
+
+        await runQuery(
+          `INSERT INTO daily_briefings (id, created_by, title, content, priority, effective_date, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [id, createdBy, title, data.brief || JSON.stringify(data), 'normal', now.split('T')[0], now]
+        );
+        console.log('Successfully generated and saved daily briefing.');
+      } else {
+        console.error('Failed to generate daily briefing via python API. Status:', response.status);
+      }
+    } catch (error) {
+      console.error('Error in daily briefing cron job:', error);
+    }
+  });
+}).catch((err) => {
   console.error('Failed to initialize database:', err);
 });
 
