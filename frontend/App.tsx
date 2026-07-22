@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { ThemeProvider } from './ThemeContext';
 import { LanguageProvider } from './LanguageContext';
 import { Layout } from './Layout';
 import { Login } from './components/Login';
@@ -8,6 +9,7 @@ import { Profile } from './components/Profile';
 import { Security } from './components/Security';
 import { AiChat } from './components/AiChat';
 import { GisMap } from './components/GisMap';
+import { NetworkGraphVisualizer } from './components/NetworkGraphVisualizer';
 
 interface User {
   id: string;
@@ -67,8 +69,8 @@ const AppContent: React.FC = () => {
         justifyContent: 'center', 
         alignItems: 'center', 
         height: '100vh', 
-        backgroundColor: '#070f19',
-        color: '#ffffff',
+        backgroundColor: 'var(--bg-primary, #070f19)',
+        color: 'var(--text-primary, #ffffff)',
         fontFamily: 'Outfit, sans-serif'
       }}>
         <h2>Loading Security Command Terminal...</h2>
@@ -95,6 +97,7 @@ const AppContent: React.FC = () => {
         <Route path="/profile" element={<Profile />} />
         <Route path="/security" element={<Security user={user} onMfaEnabled={checkSession} />} />
         <Route path="/map" element={<GisMap />} />
+        <Route path="/network" element={<NetworkGraphVisualizer />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
       <AiChat />
@@ -104,11 +107,14 @@ const AppContent: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <LanguageProvider>
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
-    </LanguageProvider>
+    <ThemeProvider>
+      <LanguageProvider>
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+      </LanguageProvider>
+    </ThemeProvider>
   );
 };
 export default App;
+

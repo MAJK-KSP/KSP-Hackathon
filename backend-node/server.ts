@@ -920,15 +920,100 @@ app.get('/api/network/entities', authenticateSession, async (req: AuthenticatedR
   }
 });
 
-// 4. Trigger Ingestion / Seed Engine
-app.post('/api/network/ingest', authenticateSession, async (req: AuthenticatedRequest, res) => {
+// 5. Create New Entity Manually (from + Add Entity modal)
+app.post('/api/network/entities', authenticateSession, async (req: AuthenticatedRequest, res) => {
   try {
+    const { entity_id, entity_type, primary_label, secondary_info, risk_score } = req.body;
+    if (!primary_label || !entity_type) {
+      return res.status(400).json({ error: 'Primary label and entity type are required.' });
+    }
+
+    const id = entity_id || `${entity_type.substring(0, 3)}-${Date.now().toString().slice(-4)}`;
+    const score = risk_score !== undefined ? Number(risk_score) : 5;
+    const secInfoStr = JSON.stringify(secondary_info || {});
+
+    // Try Supabase Postgres first if connected
     const client = getPgClient();
-    await seedNetworkGraphData(client);
-    return res.status(200).json({ success: true, message: 'Entity resolution & graph network populated successfully.' });
+    if (client) {
+      try {
+        await client`
+          INSERT INTO public.entities (entity_id, entity_type, primary_label, secondary_info, risk_score)
+          VALUES (${id}, ${entity_type}, ${primary_label}, ${secInfoStr}, ${score})
+          ON CONFLICT (entity_id) DO UPDATE SET primary_label = EXCLUDED.primary_label, risk_score = EXCLUDED.risk_score
+        `;
+      } catch (pgErr: any) {
+        console.warn('Postgres insert failed, inserting into local SQLite:', pgErr.message || pgErr);
+      }
+    }
+
+    // Always persist to local SQLite
+    await runQuery(
+      `INSERT OR REPLACE INTO entities (entity_id, entity_type, primary_label, secondary_info, risk_score, created_at)
+       VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+      [id, entity_type, primary_label, secInfoStr, score]
+    );
+
+    return res.status(201).json({
+      success: true,
+      entity: {
+        id,
+        entity_id: id,
+        entity_type,
+        type: entity_type,
+        primary_label,
+        label: primary_label,
+        secondary_info: secondary_info || {},
+        risk_score: score,
+      },
+    });
   } catch (err: any) {
-    console.error('Failed to execute entity resolution ingestion:', err);
-    return res.status(500).json({ error: 'Failed to run entity resolution pipeline' });
+    console.error('Failed to create dynamic entity:', err);
+    return res.status(500).json({ error: 'Internal server error creating entity' });
+  }
+});
+
+// 6. Create New Entity Relationship Link Manually
+app.post('/api/network/relationships', authenticateSession, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { source_entity_id, target_entity_id, relationship_type, confidence_score, evidence_snippet, casemasterid } = req.body;
+    if (!source_entity_id || !target_entity_id || !relationship_type) {
+      return res.status(400).json({ error: 'Source, target, and relationship_type are required.' });
+    }
+
+    const conf = confidence_score !== undefined ? Number(confidence_score) : 1.0;
+    const snippet = evidence_snippet || 'Manually linked by police officer during investigation.';
+
+    const client = getPgClient();
+    if (client) {
+      try {
+        await client`
+          INSERT INTO public.entity_relationships (source_entity_id, target_entity_id, relationship_type, casemasterid, confidence_score, evidence_snippet)
+          VALUES (${source_entity_id}, ${target_entity_id}, ${relationship_type}, ${casemasterid || null}, ${conf}, ${snippet})
+        `;
+      } catch (pgErr: any) {
+        console.warn('Postgres relationship insert failed, inserting into local SQLite:', pgErr.message || pgErr);
+      }
+    }
+
+    await runQuery(
+      `INSERT INTO entity_relationships (source_entity_id, target_entity_id, relationship_type, casemasterid, confidence_score, evidence_snippet, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [source_entity_id, target_entity_id, relationship_type, casemasterid || null, conf, snippet]
+    );
+
+    return res.status(201).json({
+      success: true,
+      relationship: {
+        source_entity_id,
+        target_entity_id,
+        relationship_type,
+        confidence_score: conf,
+        evidence_snippet: snippet,
+      },
+    });
+  } catch (err: any) {
+    console.error('Failed to create relationship link:', err);
+    return res.status(500).json({ error: 'Internal server error creating relationship' });
   }
 });
 

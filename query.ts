@@ -1,11 +1,11 @@
 import dotenv from 'dotenv';
 dotenv.config({ override: true });
 
-import { getAllRows } from './src/db';
+import { getAllRows } from './backend-node/db';
 
 async function main() {
   try {
-    const users = await getAllRows('SELECT email FROM users');
+    const users = await getAllRows('SELECT id, email, mfa_enabled FROM users');
     console.log('Users in DB:', users);
     process.exit(0);
   } catch (error) {

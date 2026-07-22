@@ -1,5 +1,6 @@
 import React, { useState, FormEvent } from 'react';
 import { useLanguage } from '../LanguageContext';
+import { useTheme } from '../ThemeContext';
 
 interface User {
   id: string;
@@ -14,6 +15,7 @@ interface LoginProps {
 
 export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const { t, locale, toggleLanguage } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mfaCode, setMfaCode] = useState('');
@@ -103,16 +105,39 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             </div>
           </div>
           
-          {/* Language Switcher */}
-          <div className="lang-switcher">
-            <button id="lang-toggle" className="btn-lang" onClick={toggleLanguage}>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="2" y1="12" x2="22" y2="12"></line>
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-              </svg>
-              <span id="lang-text">{locale === 'kn' ? 'English' : 'ಕನ್ನಡ'}</span>
-            </button>
+          {/* Actions: Language & Theme Switcher */}
+          <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="lang-switcher">
+              <button id="lang-toggle" className="btn-lang" onClick={toggleLanguage}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="2" y1="12" x2="22" y2="12"></line>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                </svg>
+                <span id="lang-text">{locale === 'kn' ? 'English' : 'ಕನ್ನಡ'}</span>
+              </button>
+            </div>
+
+            <div className="theme-switcher">
+              <button id="theme-toggle" className="btn-lang btn-theme" onClick={toggleTheme} title="Toggle Dark/Light Mode">
+                {theme === 'dark' ? (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="var(--ksp-gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="4"></circle>
+                      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+                    </svg>
+                    <span id="theme-text">{t("Light Mode")}</span>
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 3a6.8 6.8 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+                    </svg>
+                    <span id="theme-text">{t("Dark Mode")}</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
           
           <div className="header-brand right-brand">
