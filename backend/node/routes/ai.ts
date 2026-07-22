@@ -6,7 +6,7 @@
 
 import { Router, Response } from 'express';
 import { getRow, getAllRows, runQuery } from '../config/db';
-import { RoleAwareRequest, attachUserRole, requireAdmin } from '../middleware/role';
+import { RoleAwareRequest, attachUserRole, requireAdmin, requireRoles } from '../middleware/role';
 import { generateConversationPdf } from '../services/pdf';
 import crypto from 'crypto';
 
@@ -473,7 +473,7 @@ aiRouter.get('/briefing', async (req: RoleAwareRequest, res: Response) => {
  * POST /api/ai/briefings
  * Create a new daily briefing (admin only).
  */
-aiRouter.post('/briefings', requireAdmin, async (req: RoleAwareRequest, res: Response) => {
+aiRouter.post('/briefings', requireRoles(['supervisors']), async (req: RoleAwareRequest, res: Response) => {
   try {
     const user = req.user!;
     const { title, content, priority, target_user_id, target_role, target_station, effective_date, expires_at } = req.body;

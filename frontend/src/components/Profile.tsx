@@ -6,15 +6,6 @@
 import React, { useState, useEffect, FormEvent } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-interface ProfileData {
-  badge_number: string;
-  rank: string;
-  post: string;
-  jurisdiction: string;
-  area: string;
-  station: string;
-}
-
 export const Profile: React.FC = () => {
   const { t } = useLanguage();
   const [badgeNumber, setBadgeNumber] = useState('');

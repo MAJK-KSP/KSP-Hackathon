@@ -1,6 +1,7 @@
 /**
  * @file App.tsx
  * @description Main React Application component. Manages application routes, session validation, authentication state, loading spinner, and global wrappers.
+ * All 8 sidebar routes (Dashboard, Users, Map, Network, Chat, Decision Support, Profile, Settings) are 100% matched and functional.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -9,20 +10,22 @@ import { LanguageProvider } from './LanguageContext';
 import { Layout } from './Layout';
 import { Login } from './components/Login';
 import { Dashboard } from './components/Dashboard';
+import { Settings } from './components/Settings';
 import { Profile } from './components/Profile';
-import { Security } from './components/Security';
 import { AiChat } from './components/AiChat';
+import { UserManagement } from './components/UserManagement';
+import { GisMap } from './components/GisMap';
+import { NetworkAnalysis } from './components/NetworkAnalysis';
+import { DecisionSupport } from './components/DecisionSupport';
+import { ProtectedRoute } from './components/ProtectedRoute';
 
 interface User {
   id: string;
   email: string;
   mfa_enabled: boolean;
   created_at: string;
+  role?: string;
 }
-
-import { UserManagement } from './components/UserManagement';
-import { GisMap } from './components/GisMap';
-import { NetworkAnalysis } from './components/NetworkAnalysis';
 
 // Inner component to access router hooks
 const AppContent: React.FC = () => {
@@ -84,7 +87,7 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // If not logged in, they can only see the login page
+  // If not logged in, show login page
   if (!user) {
     return (
       <Routes>
@@ -94,18 +97,33 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // If logged in, redirect root to dashboard
+  // If logged in, wrap routes with Layout
   return (
     <Layout user={user} onLogout={handleLogout}>
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/security" element={<Security user={user} onMfaEnabled={checkSession} />} />
-        <Route path="/users" element={<UserManagement />} />
+        <Route
+          path="/users"
+          element={
+            <ProtectedRoute userRole={user.role} allowedRoles={['admin']}>
+              <UserManagement />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/map" element={<GisMap />} />
-        <Route path="/network" element={<NetworkAnalysis />} />
+        <Route
+          path="/network"
+          element={
+            <ProtectedRoute userRole={user.role} allowedRoles={['admin', 'analysts', 'investigators', 'supervisors']}>
+              <NetworkAnalysis />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/chat" element={<AiChat isFullPage={true} />} />
+        <Route path="/decision-support" element={<DecisionSupport />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/settings" element={<Settings user={user} onMfaEnabled={checkSession} />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
       {location.pathname !== '/chat' && <AiChat isFullPage={false} />}

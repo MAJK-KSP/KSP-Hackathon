@@ -12,6 +12,7 @@ from routes.briefing import router as briefing_router
 from routes.transcribe import router as transcribe_router
 from routes.synthesize import router as synthesize_router
 from routes.network_routes import router as network_router
+from routes.decision_support import router as decision_support_router
 from services.db import init_db
 
 
@@ -71,6 +72,7 @@ app.include_router(briefing_router)
 app.include_router(transcribe_router)
 app.include_router(synthesize_router)
 app.include_router(network_router)
+app.include_router(decision_support_router)
 
 
 # ---------------------------------------------------------------------------
@@ -208,7 +210,7 @@ async def chat_with_db(request: ChatRequest):
         greeting_patterns = ['hello', 'hi', 'hey', 'thanks', 'thank you', 'ok', 'okay', 'bye', 'good', 'great', 'nice', 'cool', 'sure', 'yes', 'no', 'got it']
         is_greeting = any(msg_lower.startswith(g) or msg_lower == g for g in greeting_patterns) and len(msg_lower) < 50
         if not is_greeting:
-            prompt_message += "\n\n[Available tables: casemaster, crimehead, unit, casestatusmaster, overnight_incidents, active_cases, repeat_offenders, accused, victim, complainantdetails, chargesheetdetails, act, section, arrestsurrender. Use execute_select_query tool.]"
+            prompt_message += "\n\n[Core Database Tables (10,000+ records): casemaster (10k FIRs), accused (13.3k suspects), employee (120 officers), unit (40 stations), district (10 districts), complainantdetails (10k), victim (10k), chargesheetdetails (2.5k), arrestsurrender (6k), crimehead, section. Use execute_select_query tool.]"
 
     async def event_generator():
         queue = asyncio.Queue()

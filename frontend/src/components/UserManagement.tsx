@@ -155,17 +155,17 @@ export const UserManagement: React.FC = () => {
   const getRoleBadgeStyle = (role: string) => {
     switch (role.toLowerCase()) {
       case 'investigators':
-        return { bg: '#dbeafe', color: '#1e40af', label: '🕵️‍♂️ Investigator' };
+        return { bg: '#dbeafe', color: '#1e40af', label: 'Investigator' };
       case 'analysts':
-        return { bg: '#e0e7ff', color: '#3730a3', label: '📊 Intelligence Analyst' };
+        return { bg: '#e0e7ff', color: '#3730a3', label: 'Intelligence Analyst' };
       case 'supervisors':
-        return { bg: '#fef3c7', color: '#92400e', label: '🛡️ Supervisor' };
+        return { bg: '#fef3c7', color: '#92400e', label: 'Supervisor' };
       case 'policymakers':
-        return { bg: '#f3e8ff', color: '#6b21a8', label: '📜 Policy Maker' };
+        return { bg: '#f3e8ff', color: '#6b21a8', label: 'Policy Maker' };
       case 'admin':
-        return { bg: '#fee2e2', color: '#991b1b', label: '⚙️ Administrator' };
+        return { bg: '#fee2e2', color: '#991b1b', label: 'Administrator' };
       default:
-        return { bg: '#f1f5f9', color: '#334155', label: '👮 Officer' };
+        return { bg: '#f1f5f9', color: '#334155', label: 'Officer' };
     }
   };
 
@@ -183,7 +183,7 @@ export const UserManagement: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-            🛡️ {t('Role-Based Access Control & User Administration')}
+            {t('Role-Based Access Control & User Administration')}
           </h1>
           <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '4px' }}>
             {t('Manage investigator, analyst, supervisor, and policymaker access credentials with cryptographic audit logging.')}
@@ -278,9 +278,9 @@ export const UserManagement: React.FC = () => {
                     </td>
                     <td style={{ padding: '14px 16px' }}>
                       {u.mfa_enabled ? (
-                        <span style={{ color: '#16a34a', fontWeight: 600 }}>🔒 {t('Enabled')}</span>
+                        <span style={{ color: '#16a34a', fontWeight: 600 }}>{t('Enabled')}</span>
                       ) : (
-                        <span style={{ color: '#dc2626' }}>⚠️ {t('Disabled')}</span>
+                        <span style={{ color: '#dc2626' }}>{t('Disabled')}</span>
                       )}
                     </td>
                     <td style={{ padding: '14px 16px', color: '#64748b' }}>
@@ -300,12 +300,12 @@ export const UserManagement: React.FC = () => {
                           fontWeight: 500
                         }}
                       >
-                        <option value="investigators">🕵️‍♂️ Investigator</option>
-                        <option value="analysts">📊 Analyst</option>
-                        <option value="supervisors">🛡️ Supervisor</option>
-                        <option value="policymakers">📜 Policymaker</option>
-                        <option value="admin">⚙️ Admin</option>
-                        <option value="officer">👮 Officer</option>
+                        <option value="investigators">Investigator</option>
+                        <option value="analysts">Analyst</option>
+                        <option value="supervisors">Supervisor</option>
+                        <option value="policymakers">Policymaker</option>
+                        <option value="admin">Admin</option>
+                        <option value="officer">Officer</option>
                       </select>
                     </td>
                   </tr>
@@ -371,7 +371,7 @@ export const UserManagement: React.FC = () => {
         <div className="ai-modal-backdrop" onClick={() => setShowCreateModal(false)}>
           <div className="ai-preview-modal" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
             <div className="ai-modal-header">
-              <h3>👤 {t('Create User & Assign RBAC Role')}</h3>
+              <h3>{t('Create User & Assign RBAC Role')}</h3>
               <button className="ai-modal-close" onClick={() => setShowCreateModal(false)}>×</button>
             </div>
 
@@ -379,12 +379,12 @@ export const UserManagement: React.FC = () => {
               <div className="ai-modal-body" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {formError && (
                   <div style={{ backgroundColor: '#fee2e2', border: '1px solid #fca5a5', color: '#991b1b', padding: '8px 12px', borderRadius: '6px', fontSize: '0.825rem' }}>
-                    ⚠️ {formError}
+                    {formError}
                   </div>
                 )}
                 {formSuccess && (
                   <div style={{ backgroundColor: '#dcfce7', border: '1px solid #86efac', color: '#166534', padding: '8px 12px', borderRadius: '6px', fontSize: '0.825rem' }}>
-                    ✓ {formSuccess}
+                    {formSuccess}
                   </div>
                 )}
 
@@ -425,12 +425,12 @@ export const UserManagement: React.FC = () => {
                     onChange={e => setNewRole(e.target.value)}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 600 }}
                   >
-                    <option value="investigators">🕵️‍♂️ Investigator (Crime Investigation)</option>
-                    <option value="analysts">📊 Intelligence Analyst (Data & Trends)</option>
-                    <option value="supervisors">🛡️ Supervisor (Station Supervision)</option>
-                    <option value="policymakers">📜 Policymaker (Governance & Policy)</option>
-                    <option value="admin">⚙️ Administrator (System Admin)</option>
-                    <option value="officer">👮 Officer (General Duty)</option>
+                    <option value="investigators">Investigator (Crime Investigation)</option>
+                    <option value="analysts">Intelligence Analyst (Data & Trends)</option>
+                    <option value="supervisors">Supervisor (Station Supervision)</option>
+                    <option value="policymakers">Policymaker (Governance & Policy)</option>
+                    <option value="admin">Administrator (System Admin)</option>
+                    <option value="officer">Officer (General Duty)</option>
                   </select>
                 </div>
 

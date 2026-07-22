@@ -194,6 +194,12 @@ adminRouter.put('/users/:id/role', requireAdmin, async (req: RoleAwareRequest, r
     const { id } = req.params;
     const { role } = req.body;
 
+    // Validate UUID URL parameter format to prevent injection attacks
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!id || !uuidRegex.test(id)) {
+      return res.status(400).json({ error: 'Invalid or malformed user ID in request URL' });
+    }
+
     const assignedRole = (role || '').toLowerCase().trim();
     if (!ALLOWED_ROLES.includes(assignedRole as any)) {
       return res.status(400).json({
@@ -263,7 +269,7 @@ adminRouter.get('/rbac-audit-logs', requireAdmin, async (req: RoleAwareRequest, 
         l.created_at,
         l.cryptographic_signature
       FROM rbac_audit_logs l
-      LEFT JOIN users u ON l.performed_by = u.id
+      LEFT JOIN users u ON l.performed_by::text = u.id::text
       ORDER BY l.created_at DESC
       LIMIT 100
     `);

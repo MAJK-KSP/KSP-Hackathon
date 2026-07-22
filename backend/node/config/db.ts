@@ -28,7 +28,10 @@ if (connectionString.startsWith(prefix)) {
       const colonIdx = credentials.indexOf(':');
       const user = credentials.slice(0, colonIdx);
       const pwd = credentials.slice(colonIdx + 1);
-      const encodedPwd = encodeURIComponent(pwd);
+      // Decode first in case the password is already URL-encoded (e.g., %40 for @),
+      // then re-encode to ensure consistent, valid encoding.
+      const decodedPwd = decodeURIComponent(pwd);
+      const encodedPwd = encodeURIComponent(decodedPwd);
       connectionString = `${prefix}${user}:${encodedPwd}@${hostDb}`;
     }
   }
@@ -54,7 +57,8 @@ if (datasetConnectionString.startsWith(prefix)) {
       const colonIdx = credentials.indexOf(':');
       const user = credentials.slice(0, colonIdx);
       const pwd = credentials.slice(colonIdx + 1);
-      const encodedPwd = encodeURIComponent(pwd);
+      const decodedPwd = decodeURIComponent(pwd);
+      const encodedPwd = encodeURIComponent(decodedPwd);
       datasetConnectionString = `${prefix}${user}:${encodedPwd}@${hostDb}`;
     }
   }
@@ -261,7 +265,84 @@ export const initDb = async () => {
   await runQuery(`CREATE INDEX IF NOT EXISTS idx_cases_police_station ON cases(police_station);`);
   await runQuery(`CREATE INDEX IF NOT EXISTS idx_cases_date ON cases(reported_date);`);
 
+  // Investigation tables for Feature 6 (Investigator Decision Support)
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS investigation_cases (
+      case_id TEXT PRIMARY KEY,
+      case_number TEXT UNIQUE NOT NULL,
+      title TEXT NOT NULL,
+      crime_type TEXT NOT NULL,
+      police_station TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'Active',
+      incident_date TEXT NOT NULL,
+      location TEXT NOT NULL,
+      description TEXT NOT NULL,
+      investigating_officer TEXT NOT NULL,
+      outcome TEXT
+    );
+  `);
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS investigation_logs (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL REFERENCES investigation_cases(case_id) ON DELETE CASCADE,
+      timestamp TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      log_type TEXT NOT NULL,
+      description TEXT NOT NULL
+    );
+  `);
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS investigation_evidence (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL REFERENCES investigation_cases(case_id) ON DELETE CASCADE,
+      evidence_type TEXT NOT NULL,
+      description TEXT NOT NULL,
+      collected_at TEXT NOT NULL,
+      location_found TEXT NOT NULL,
+      status TEXT NOT NULL
+    );
+  `);
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS investigation_interviews (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL REFERENCES investigation_cases(case_id) ON DELETE CASCADE,
+      interviewee_name TEXT NOT NULL,
+      role TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      interview_date TEXT NOT NULL
+    );
+  `);
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS investigation_suspects (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL REFERENCES investigation_cases(case_id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      alias TEXT,
+      status TEXT NOT NULL,
+      alibi_status TEXT NOT NULL,
+      notes TEXT
+    );
+  `);
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS investigation_locations (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL REFERENCES investigation_cases(case_id) ON DELETE CASCADE,
+      location_name TEXT NOT NULL,
+      location_type TEXT NOT NULL,
+      address TEXT NOT NULL
+    );
+  `);
+
+  await runQuery(`CREATE INDEX IF NOT EXISTS idx_inv_logs_case ON investigation_logs(case_id, timestamp);`);
+  await runQuery(`CREATE INDEX IF NOT EXISTS idx_inv_cases_status ON investigation_cases(status);`);
+
   await seedCases();
+  await seedInvestigationData();
 
   console.log('PostgreSQL database initialized successfully.');
 };
@@ -351,3 +432,199 @@ async function seedCases() {
     console.error('Failed to seed cases database:', err);
   }
 }
+
+async function seedInvestigationData() {
+  try {
+    const existing = await getRow<{ count: string | number }>('SELECT count(*) as count FROM investigation_cases');
+    if (existing && parseInt(String(existing.count), 10) > 0) {
+      return;
+    }
+    console.log('Seeding initial investigation cases and pipeline dataset...');
+
+    const cases = [
+      {
+        case_id: 'CASE-2026-KOR-001',
+        case_number: 'FIR-2026-KOR-001',
+        title: 'Koramangala Commercial Safe Heist',
+        crime_type: 'Commercial Burglary & Safe Heist',
+        police_station: 'Koramangala Police Station',
+        status: 'Active',
+        incident_date: '2026-07-20 02:15:00',
+        location: 'Commercial Gold Exchange, 80 Feet Road, Koramangala',
+        description: 'Nighttime vault break-in at Commercial Gold Exchange. Culprits forced open rear ventilation grill using hydraulic jacks, deployed a 433MHz RF signal jammer to disable silent alarm alerts, and used an oxy-acetylene torch to cut open the inner wall safe. Disables CCTV DVR storage unit.',
+        investigating_officer: 'Inspector R. Shankara',
+        outcome: null
+      },
+      {
+        case_id: 'CASE-2026-IND-002',
+        case_number: 'FIR-2026-IND-002',
+        title: 'Indiranagar Luxury Boutique Robbery',
+        crime_type: 'Armed Robbery & Jewelry Heist',
+        police_station: 'Indiranagar Police Station',
+        status: 'Active',
+        incident_date: '2026-07-21 21:45:00',
+        location: 'Royal Gems Boutique, 100 Feet Road, Indiranagar',
+        description: 'Armed robbery at closing time. Masked suspects bypassed rear fire door security sensors, held staff at gunpoint, used RF shielding Faraday bags to block GPS tracking tags on diamond trays, and fled in a black SUV.',
+        investigating_officer: 'Sub-Inspector M. Lakshmi',
+        outcome: null
+      },
+      {
+        case_id: 'CASE-2026-WHI-003',
+        case_number: 'FIR-2026-WHI-003',
+        title: 'Whitefield Corporate Ransomware & Wire Fraud',
+        crime_type: 'Cyber Crime & Corporate Wire Extortion',
+        police_station: 'Whitefield Police Station',
+        status: 'Active',
+        incident_date: '2026-07-19 14:30:00',
+        location: 'Apex Technology Park, Whitefield',
+        description: 'Corporate spear-phishing attack compromising finance executive credentials. Attackers initiated fraudulent wire transfers totaling ₹2.4 Crores to mule accounts, deploying crypto ransomware on internal servers to obscure log traces.',
+        investigating_officer: 'Inspector K. Ponnappa',
+        outcome: null
+      },
+      {
+        case_id: 'CASE-2025-CLOSED-01',
+        case_number: 'FIR-2025-JAY-882',
+        title: 'Jayanagar Jewelers Vault Break-in',
+        crime_type: 'Commercial Burglary & Safe Heist',
+        police_station: 'Jayanagar Police Station',
+        status: 'Closed',
+        incident_date: '2025-11-14 03:00:00',
+        location: 'Jayanagar 4th Block Gold Plaza',
+        description: 'Nighttime vault break-in using oxy-acetylene torch, hydraulic jacks, RF signal jammer to disable GSM alarm alerts, and removal of CCTV DVR units.',
+        investigating_officer: 'Inspector V. Nanjappa',
+        outcome: 'Solved after tracing 433MHz RF signal jammer serial number to specialized electronics store in SP Road. Toolmark analysis on safe metal slag matched custom oxy-acetylene nozzle confiscated during raid on gang hideout in Peenya. 3 suspects convicted, 95% stolen jewelry recovered.'
+      },
+      {
+        case_id: 'CASE-2025-CLOSED-02',
+        case_number: 'FIR-2025-MAL-412',
+        title: 'Malleshwaram Electronics Safe Breach',
+        crime_type: 'Commercial Burglary & Safe Heist',
+        police_station: 'Malleshwaram Police Station',
+        status: 'Closed',
+        incident_date: '2025-08-09 01:45:00',
+        location: 'Sampige Road Malleshwaram',
+        description: 'Safecracking using heavy hydraulic cutters, ventilation shaft entry, partial latent fingerprint on air duct grill, getaway vehicle Mahindra Scorpio.',
+        investigating_officer: 'Inspector S. Patil',
+        outcome: 'Solved by cross-referencing cell tower dump records at incident window with registered MO safe breakers. Fingerprint from air duct matched suspect Ramesh Kumar (Kala Ramesh). Surveillance team apprehended gang members in Mysore bus station with ₹45 Lakh cash.'
+      },
+      {
+        case_id: 'CASE-2025-CLOSED-03',
+        case_number: 'FIR-2025-CUB-109',
+        title: 'M.G. Road Watch Showroom Armed Robbery',
+        crime_type: 'Armed Robbery & Jewelry Heist',
+        police_station: 'Cubbon Park Police Station',
+        status: 'Closed',
+        incident_date: '2025-05-22 20:15:00',
+        location: 'M.G. Road Promenade',
+        description: 'Masked armed robbery using RF shielding Faraday bags to block GPS tracking chips, rear fire exit getaway, dark SUV with fake license plates.',
+        investigating_officer: 'Inspector B. Suresh',
+        outcome: 'Solved by tracing specialized Faraday pouch online purchases and analyzing ANPR (Automatic Number Plate Recognition) cameras along Outer Ring Road, identifying getaway SUV registered under alias. All 4 gang members arrested.'
+      },
+      {
+        case_id: 'CASE-2025-CLOSED-04',
+        case_number: 'FIR-2025-WHI-704',
+        title: 'Hebbal Tech Park Financial Wire Fraud',
+        crime_type: 'Cyber Crime & Corporate Wire Extortion',
+        police_station: 'Whitefield Police Station',
+        status: 'Closed',
+        incident_date: '2025-03-11 11:00:00',
+        location: 'Hebbal Tech Ring',
+        description: 'Spear-phishing email compromise targeting corporate finance leads, mule account transfers, ransomware log wipe.',
+        investigating_officer: 'Inspector K. Ponnappa',
+        outcome: 'Solved by freezing beneficiary mule accounts within 2 hours of report and analyzing IP transit logs from cloud VPN endpoints. Cyber Crime Cell apprehended ringleader operating out of cyber cafe in Yelahanka.'
+      }
+    ];
+
+    for (const c of cases) {
+      await runQuery(
+        `INSERT INTO investigation_cases (case_id, case_number, title, crime_type, police_station, status, incident_date, location, description, investigating_officer, outcome)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (case_id) DO NOTHING`,
+        [c.case_id, c.case_number, c.title, c.crime_type, c.police_station, c.status, c.incident_date, c.location, c.description, c.investigating_officer, c.outcome]
+      );
+    }
+
+    const logs = [
+      { id: 'LOG-KOR-101', case_id: 'CASE-2026-KOR-001', timestamp: '2026-07-20 02:15:00', actor: 'Central Dispatch', log_type: 'LOG', description: 'Silent motion sensor alarm tripped at Commercial Gold Exchange, 80 Feet Road. Patrol Car 14 dispatched.' },
+      { id: 'LOG-KOR-102', case_id: 'CASE-2026-KOR-001', timestamp: '2026-07-20 02:22:00', actor: 'Patrol Officer Naik', log_type: 'LOG', description: 'First responders arrived. Front glass intact. Rear ventilation grill breached using hydraulic spreader tools.' },
+      { id: 'LOG-KOR-103', case_id: 'CASE-2026-KOR-001', timestamp: '2026-07-20 03:00:00', actor: 'Inspector R. Shankara', log_type: 'LOG', description: 'Crime Scene Investigation team cordoned area. Main safe cut open using oxy-acetylene torch. Local CCTV DVR missing.' },
+      { id: 'LOG-KOR-104', case_id: 'CASE-2026-KOR-001', timestamp: '2026-07-20 05:30:00', actor: 'Forensic Expert Dr. Aruna', log_type: 'EVIDENCE_COLLECTED', description: 'Recovered 433MHz active RF signal jammer hidden in air duct near safe room. Torch burn slag collected for metallurgical testing.' },
+      { id: 'LOG-KOR-105', case_id: 'CASE-2026-KOR-001', timestamp: '2026-07-20 09:15:00', actor: 'SI Chethan', log_type: 'EVIDENCE_COLLECTED', description: 'Obtained secondary CCTV footage from HDFC ATM across the street showing grey Mahindra Scorpio parked at 01:45 AM.' },
+      { id: 'LOG-KOR-106', case_id: 'CASE-2026-KOR-001', timestamp: '2026-07-20 11:30:00', actor: 'Inspector R. Shankara', log_type: 'INTERVIEW_RECORDED', description: 'Recorded witness statement of night watchman Somanna. Reported seeing 3 men in dark overalls loading duffel bags at 02:10 AM.' },
+      { id: 'LOG-KOR-107', case_id: 'CASE-2026-KOR-001', timestamp: '2026-07-21 14:00:00', actor: 'Fingerprint Bureau', log_type: 'FORENSIC_ANALYSIS', description: 'Partial thumbprint lifted from ventilation duct frame matched criminal record of Ramesh Kumar alias Kala Ramesh.' }
+    ];
+
+    for (const l of logs) {
+      await runQuery(
+        `INSERT INTO investigation_logs (id, case_id, timestamp, actor, log_type, description)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO NOTHING`,
+        [l.id, l.case_id, l.timestamp, l.actor, l.log_type, l.description]
+      );
+    }
+
+    const evidence = [
+      { id: 'EVD-KOR-001', case_id: 'CASE-2026-KOR-001', evidence_type: 'Oxy-Acetylene Torch Slag & Burn Mark Samples', description: 'Metal residue extracted from safe door cut borders', collected_at: '2026-07-20 03:30:00', location_found: 'Main Vault Safe Door', status: 'In Forensic Lab' },
+      { id: 'EVD-KOR-002', case_id: 'CASE-2026-KOR-001', evidence_type: '433MHz Active RF Signal Jammer', description: 'Portable multi-channel jammer used to block GSM cellular security alerts', collected_at: '2026-07-20 05:30:00', location_found: 'Air Ventilation Duct', status: 'Secured in Evidence Locker' },
+      { id: 'EVD-KOR-003', case_id: 'CASE-2026-KOR-001', evidence_type: 'Partial Latent Fingerprint Lift', description: 'Thumbprint lifted from metallic ventilation grill frame', collected_at: '2026-07-20 04:15:00', location_found: 'Rear Ventilation Shaft', status: 'Matched to Suspect Record' },
+      { id: 'EVD-KOR-004', case_id: 'CASE-2026-KOR-001', evidence_type: 'HDFC ATM Exterior CCTV Footage', description: 'Video clip showing grey SUV parked 30m from crime scene between 01:45 AM and 02:12 AM', collected_at: '2026-07-20 09:15:00', location_found: 'HDFC Bank ATM CCTV Server', status: 'Digital Archive' }
+    ];
+
+    for (const e of evidence) {
+      await runQuery(
+        `INSERT INTO investigation_evidence (id, case_id, evidence_type, description, collected_at, location_found, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO NOTHING`,
+        [e.id, e.case_id, e.evidence_type, e.description, e.collected_at, e.location_found, e.status]
+      );
+    }
+
+    const interviews = [
+      { id: 'INT-KOR-001', case_id: 'CASE-2026-KOR-001', interviewee_name: 'Somanna (Age 52)', role: 'Witness (Night Watchman)', summary: 'Stated he saw a grey SUV with blurred rear plate idling with parking lights on around 01:50 AM. Observed three men carrying heavy bags into the trunk before driving towards Madiwala at high speed.', interview_date: '2026-07-20 11:30:00' },
+      { id: 'INT-KOR-002', case_id: 'CASE-2026-KOR-001', interviewee_name: 'Venkatesh Rao (Age 45)', role: 'Victim (Store Owner)', summary: 'Confirmed theft of 4.2 kg gold bullion and ₹18 Lakhs cash. Stated only 3 senior employees possessed safe combination, but torch cut bypassed keylock.', interview_date: '2026-07-20 10:00:00' }
+    ];
+
+    for (const i of interviews) {
+      await runQuery(
+        `INSERT INTO investigation_interviews (id, case_id, interviewee_name, role, summary, interview_date)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO NOTHING`,
+        [i.id, i.case_id, i.interviewee_name, i.role, i.summary, i.interview_date]
+      );
+    }
+
+    const suspects = [
+      { id: 'SUS-KOR-001', case_id: 'CASE-2026-KOR-001', name: 'Ramesh Kumar', alias: 'Kala Ramesh', status: 'Prime Suspect', alibi_status: 'Unverified Alibi', notes: 'Known safe breaker with 4 prior convictions involving oxy-acetylene torching. Partial fingerprint match on ventilation shaft grill.' },
+      { id: 'SUS-KOR-002', case_id: 'CASE-2026-KOR-001', name: 'Sunil Kumar', alias: 'Chota Suresh', status: 'Person of Interest', alibi_status: 'Claims in Hosur', notes: 'Electronics specialist known for assembling RF signal jammers. Frequently collaborates with Kala Ramesh.' }
+    ];
+
+    for (const s of suspects) {
+      await runQuery(
+        `INSERT INTO investigation_suspects (id, case_id, name, alias, status, alibi_status, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO NOTHING`,
+        [s.id, s.case_id, s.name, s.alias, s.status, s.alibi_status, s.notes]
+      );
+    }
+
+    const locations = [
+      { id: 'LOC-KOR-001', case_id: 'CASE-2026-KOR-001', location_name: 'Commercial Gold Exchange Premises', location_type: 'Crime Scene', address: '80 Feet Road, Koramangala 4th Block, Bengaluru' },
+      { id: 'LOC-KOR-002', case_id: 'CASE-2026-KOR-001', location_name: 'Koramangala 100ft Junction', location_type: 'Escape Route', address: 'Koramangala 100 Feet Road Signal to Madiwala Underpass' },
+      { id: 'LOC-KOR-003', case_id: 'CASE-2026-KOR-001', location_name: 'Peenya Industrial Hideout', location_type: 'Suspect Hideout', address: 'Plot 42, Peenya 2nd Stage Industrial Area' }
+    ];
+
+    for (const loc of locations) {
+      await runQuery(
+        `INSERT INTO investigation_locations (id, case_id, location_name, location_type, address)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO NOTHING`,
+        [loc.id, loc.case_id, loc.location_name, loc.location_type, loc.address]
+      );
+    }
+
+    console.log('Seeding complete: investigation dataset created successfully.');
+  } catch (err) {
+    console.error('Failed to seed investigation database:', err);
+  }
+}
+

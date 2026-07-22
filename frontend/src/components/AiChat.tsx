@@ -758,7 +758,7 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
           return;
         }
 
-        const cells = trimmed.split('|').map(c => c.trim()).filter((c, idx, arr) => idx > 0 && idx < arr.length - 1);
+        const cells = trimmed.split('|').map(c => c.trim()).filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
         tableRows.push(cells);
       } else {
         if (inTable) {

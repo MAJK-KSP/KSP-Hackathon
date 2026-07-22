@@ -1,11 +1,12 @@
 /**
  * @file LanguageContext.tsx
- * @description Context provider for language state, handling translation lookups (English and Kannada) for localization across the dashboard.
+ * @description Master Language Provider enabling Auto-Translate to Kannada across the entire website.
+ * Combines local dictionary lookup and dynamic Google Translate DOM translation engine.
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-// Local Translation Dictionary
+// Comprehensive English -> Kannada Translation Dictionary
 const dictionary: Record<string, string> = {
   // Headers & Sidebar
   "KARNATAKA STATE POLICE": "ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್",
@@ -16,6 +17,10 @@ const dictionary: Record<string, string> = {
   "Officer Profile": "ಅಧಿಕಾರಿ ಪ್ರೊಫೈಲ್",
   "MFA Security": "ಎಂಎಫ್ಎ ಭದ್ರತೆ",
   "AI Assistant": "ಎಐ ಸಹಾಯಕ",
+  "Settings": "ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
+  "Network Analysis": "ನೆಟ್‌ವರ್ಕ್ ವಿಶ್ಲೇಷಣೆ",
+  "Show Case Network": "ಪ್ರಕರಣ ನೆಟ್‌ವರ್ಕ್ ತೋರಿಸಿ",
+  "Show Gang Network": "ಗ್ಯಾಂಗ್ ನೆಟ್‌ವರ್ಕ್ ತೋರಿಸಿ",
   "GIS Command Map": "ಜಿಐಎಸ್ ಕಮಾಂಡ್ ಮ್ಯಾಪ್",
   "Map View": "ನಕ್ಷೆ ವೀಕ್ಷಣೆ",
   "Total Cases": "ಒಟ್ಟು ಪ್ರಕರಣಗಳು",
@@ -76,9 +81,9 @@ const dictionary: Record<string, string> = {
   "Untitled": "ಶೀರ್ಷಿಕೆ ಇಲ್ಲ",
   "Delete": "ಅಳಿಸಿ",
   "Ask questions about cases, datasets, policies, or get your daily briefing.": "ಪ್ರಕರಣಗಳು, ಡೇಟಾಸೆಟ್‌ಗಳು, ನೀತಿಗಳ ಬಗ್ಗೆ ಪ್ರಶ್ನೆಗಳನ್ನು ಕೇಳಿ ಅಥವಾ ನಿಮ್ಮ ದೈನಂದಿನ ಮಾಹಿತಿಯನ್ನು ಪಡೆಯಿರಿ.",
-  "📋 Today's Briefing": "📋 ಇಂದಿನ ಮಾಹಿತಿ",
-  "📊 Recent Updates": "📊 ಇತ್ತೀಚಿನ ನವೀಕರಣಗಳು",
-  "🔍 Query Help": "🔍 ಪ್ರಶ್ನೆ ಸಹಾಯ",
+  "Today's Briefing": "ಇಂದಿನ ಮಾಹಿತಿ",
+  "Recent Updates": "ಇತ್ತೀಚಿನ ನವೀಕರಣಗಳು",
+  "Query Help": "ಪ್ರಶ್ನೆ ಸಹಾಯ",
   "Ask the KSP AI Assistant...": "KSP ಎಐ ಸಹಾಯಕನನ್ನು ಕೇಳಿ...",
   "Send Message": "ಸಂದೇಶ ಕಳುಹಿಸಿ",
   "Sorry, something went wrong. Please try again.": "ಕ್ಷಮಿಸಿ, ಏನೋ ತಪ್ಪಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೊಮ್ಮೆ ಪ್ರಯತ್ನಿಸಿ.",
@@ -114,14 +119,29 @@ const dictionary: Record<string, string> = {
   "Police Station": "ಪೊಲೀಸ್ ಠಾಣೆ",
   "Jurisdiction": "ವ್ಯಾಪ್ತಿ",
   "Please configure your officer profile in the Profile settings tab.": "ದಯವಿಟ್ಟು ಪ್ರೊಫೈಲ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳ ಟ್ಯಾಬ್‌ನಲ್ಲಿ ನಿಮ್ಮ ಅಧಿಕಾರಿ ಪ್ರೊಫೈಲ್ ಅನ್ನು ಕಾನ್ಫಿಗರ್ ಮಾಡಿ.",
-  "LOW": "ಕಡಿಮೆ",
-  "NORMAL": "ಸಾಮಾನ್ಯ",
-  "HIGH": "ಹೆಚ್ಚು",
-  "URGENT": "ತುರ್ತು",
-  "Low": "ಕಡಿಮೆ",
-  "Normal": "ಸಾಮಾನ್ಯ",
-  "High": "ಹೆಚ್ಚು",
-  "Urgent": "ತುರ್ತು",
+
+  // Investigator Active Case Intelligence (Feature 6)
+  "Investigator Decision Support System": "ತನಿಖಾಧಿಕಾರಿಯ ನಿರ್ಧಾರ ಬೆಂಬಲ ವ್ಯವಸ್ಥೆ",
+  "Investigator Active Case Intelligence": "ತನಿಖಾಧಿಕಾರಿಯ ಸಕ್ರಿಯ ಪ್ರಕರಣದ ಮಾಹಿತಿ",
+  "100% Direct SQL Database Query — Case Summary, Accused Suspects, Complainants & Timeline": "೧೦೦% ನೇರ ಎಸ್‌ಕ್ಯೂಎಲ್ ಡೇಟಾಬೇಸ್ ಪ್ರಶ್ನೆ — ಪ್ರಕರಣದ ಸಾರಾಂಶ, ಆರೋಪಿಗಳು, ದೂರುದಾರರು ಮತ್ತು ಕಾಲಾನುಕ್ರಮ",
+  "All Active Cases (Only from Database)": "ಎಲ್ಲಾ ಸಕ್ರಿಯ ಪ್ರಕರಣಗಳು (ಡೇಟಾಬೇಸ್‌ನಿಂದ ಮಾತ್ರ)",
+  "SQL DATABASE CONNECTED": "ಎಸ್‌ಕ್ಯೂಎಲ್ ಡೇಟಾಬೇಸ್ ಸಂಪರ್ಕಗೊಂಡಿದೆ",
+  "UNDER ACTIVE INVESTIGATION": "ಸಕ್ರಿಯ ತನಿಖೆಯಲ್ಲಿದೆ",
+  "Lead Officer": "ಮುಖ್ಯ ತನಿಖಾಧಿಕಾರಿ",
+  "Police Station": "ಪೊಲೀಸ್ ಠಾಣೆ",
+  "Crime Classification": "ಅಪರಾಧದ ವರ್ಗೀಕರಣ",
+  "Incident Landmark": "ಘಟನೆಯ ಹೆಗ್ಗುರುತು",
+  "Registration Timestamp": "ನೊಂದಣಿ ಸಮಯ",
+  "Factual Case Summary (SQL Database `brieffacts` Record)": "ವಾಸ್ತವಿಕ ಪ್ರಕರಣದ ಸಾರಾಂಶ (ಎಸ್‌ಕ್ಯೂಎಲ್ ಡೇಟಾಬೇಸ್ `brieffacts` ದಾಖಲೆ)",
+  "Tagged Accused / Suspects": "ಲಿಂಕ್ ಮಾಡಲಾದ ಆರೋಪಿಗಳು / ಶಂಕಿತರು",
+  "Complainants & Victims": "ದೂರುದಾರರು ಮತ್ತು ಸಂತ್ರಸ್ತರು",
+  "Complainant(s):": "ದೂರುದಾರರು:",
+  "Victim(s):": "ಸಂತ್ರಸ್ತರು:",
+  "Chronological Investigation Timeline (Database Events)": "ಕಾಲಾನುಕ್ರಮದ ತನಿಖಾ ಪಟ್ಟಿ (ಡೇಟಾಬೇಸ್ ಘಟನೆಗಳು)",
+  "No accused persons currently listed in database for this FIR.": "ಈ ಎಫ್‌ಐಆರ್‌ಗೆ ಡೇಟಾಬೇಸ್‌ನಲ್ಲಿ ಯಾವುದೇ ಆರೋಪಿಗಳನ್ನು ಪಟ್ಟಿ ಮಾಡಲಾಗಿಲ್ಲ.",
+  "No complainant or victim records found.": "ಯಾವುದೇ ದೂರುದಾರ ಅಥವಾ ಸಂತ್ರಸ್ತರ ದಾಖಲೆಗಳು ಕಂಡುಬಂದಿಲ್ಲ.",
+  "User Management": "ಬಳಕೆದಾರರ ನಿರ್ವಹಣೆ",
+  "Decision Support": "ತನಿಖಾ ನಿರ್ಧಾರ ಬೆಂಬಲ",
 
   // Profile Page
   "Officer Profile Details": "ಅಧಿಕಾರಿ ಪ್ರೊಫೈಲ್ ವಿವರಗಳು",
@@ -144,7 +164,6 @@ const dictionary: Record<string, string> = {
   "Crime Branch Head": "ಕ್ರೈಮ್ ಬ್ರಾಂಚ್ ಹೆಡ್",
   "Traffic In-charge": "ಟ್ರಾಫಿಕ್ ಇನ್‌ಚಾರ್ಜ್",
   "Patrol Officer": "ಪೆಟ್ರೋಲ್ ಆಫೀಸರ್",
-  "Jurisdiction": "商ಪತಿ (Jurisdiction)",
   "Select Jurisdiction...": "ವ್ಯಾಪ್ತಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ...",
   "Bengaluru City Police": "ಬೆಂಗಳೂರು ನಗರ ಪೊಲೀಸ್",
   "Mysuru City Police": "ಮೈಸೂರು ನಗರ ಪೊಲೀಸ್",
@@ -162,7 +181,6 @@ const dictionary: Record<string, string> = {
   "M.G. Road": "ಎಂ.ಜಿ. ರಸ್ತೆ",
   "Hebbal": "ಹೆಬ್ಬಾಳ",
   "Malleshwaram": "ಮಲ್ಲೇಶ್ವರಂ",
-  "Police Station": "ಪೊಲೀಸ್ ಠಾಣೆ",
   "Select Police Station...": "ಪೊಲೀಸ್ ಠಾಣೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ...",
   "Koramangala Police Station": "ಕೋರಮಂಗಲ ಪೊಲೀಸ್ ಠಾಣೆ",
   "Indiranagar Police Station": "ಇಂದಿರಾನಗರ ಪೊಲೀಸ್ ಠಾಣೆ",
@@ -219,11 +237,11 @@ interface LanguageContextType {
   locale: 'en' | 'kn';
   t: (key: string) => string;
   toggleLanguage: () => void;
+  setLanguage: (lang: 'en' | 'kn') => void;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-// Extend Window interface for Google Translate
 declare global {
   interface Window {
     googleTranslateElementInit?: () => void;
@@ -236,7 +254,6 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
   });
 
   useEffect(() => {
-    // Save preference
     localStorage.setItem('pref-lang', locale);
 
     // Update document title dynamically
@@ -248,21 +265,21 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
       document.title = "KSP - Karnataka State Police Secure Portal";
     }
 
-    // Google Translate fallback trigger
+    // Google Translate Auto-DOM Engine
     const triggerGoogleTranslate = (langCode: string) => {
       const select = document.querySelector('select.goog-te-combo') as HTMLSelectElement;
       if (select) {
         select.value = langCode;
         select.dispatchEvent(new Event('change'));
       } else {
-        setTimeout(() => triggerGoogleTranslate(langCode), 150);
+        setTimeout(() => triggerGoogleTranslate(langCode), 200);
       }
     };
 
     triggerGoogleTranslate(locale === 'kn' ? 'kn' : '');
   }, [locale]);
 
-  // Load Google Translate Script in background on mount
+  // Load Google Translate Widget Script in background
   useEffect(() => {
     window.googleTranslateElementInit = () => {
       // @ts-ignore
@@ -274,15 +291,18 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
       }, 'google_translate_element');
     };
 
-    const el = document.createElement('div');
-    el.id = 'google_translate_element';
-    el.style.position = 'absolute';
-    el.style.top = '-9999px';
-    el.style.left = '-9999px';
-    el.style.width = '1px';
-    el.style.height = '1px';
-    el.style.overflow = 'hidden';
-    document.body.appendChild(el);
+    let el = document.getElementById('google_translate_element');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'google_translate_element';
+      el.style.position = 'absolute';
+      el.style.top = '-9999px';
+      el.style.left = '-9999px';
+      el.style.width = '1px';
+      el.style.height = '1px';
+      el.style.overflow = 'hidden';
+      document.body.appendChild(el);
+    }
 
     const script = document.createElement('script');
     script.type = 'text/javascript';
@@ -290,12 +310,12 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
     document.head.appendChild(script);
 
     return () => {
-      document.body.removeChild(el);
-      document.head.removeChild(script);
+      if (script.parentNode) script.parentNode.removeChild(script);
     };
   }, []);
 
   const t = (key: string): string => {
+    if (!key) return '';
     if (locale === 'kn' && dictionary[key]) {
       return dictionary[key];
     }
@@ -306,8 +326,12 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
     setLocale((prev) => (prev === 'kn' ? 'en' : 'kn'));
   };
 
+  const setLanguage = (lang: 'en' | 'kn') => {
+    setLocale(lang);
+  };
+
   return (
-    <LanguageContext.Provider value={{ locale, t, toggleLanguage }}>
+    <LanguageContext.Provider value={{ locale, t, toggleLanguage, setLanguage }}>
       {children}
     </LanguageContext.Provider>
   );

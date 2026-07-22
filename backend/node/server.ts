@@ -32,9 +32,11 @@ import {
   AuthenticatedRequest,
   securityHeaders,
 } from './middleware/auth';
-import { attachUserRole } from './middleware/role';
+import { attachUserRole, requireRoles, RoleAwareRequest } from './middleware/role';
 import { aiRouter } from './routes/ai';
 import { adminRouter } from './routes/admin';
+import { decisionSupportRouter } from './routes/decision_support';
+import { entityResolutionRouter, initNetworkSchema } from './routes/entityResolution';
 
 dotenv.config();
 
@@ -74,7 +76,7 @@ const publicPath = fs.existsSync(path.resolve(__dirname, '../dist/public'))
       : path.resolve(__dirname, '../src/public');
 
 // Page Routes (with Secure Redirects for React SPA)
-app.get(['/', '/dashboard', '/profile', '/security', '/users'], async (req, res) => {
+app.get(['/', '/dashboard', '/profile', '/security', '/users', '/map', '/network', '/decision-support', '/chat'], async (req, res) => {
   const sessionId = req.cookies.session_id;
   const isRoot = req.path === '/';
 
@@ -337,8 +339,13 @@ app.post('/api/auth/logout', authenticateSession, async (req: AuthenticatedReque
 });
 
 // 6. Current User Info
-app.get('/api/auth/me', authenticateSession, (req: AuthenticatedRequest, res) => {
-  return res.status(200).json({ user: req.user });
+app.get('/api/auth/me', authenticateSession, attachUserRole, (req: RoleAwareRequest, res) => {
+  return res.status(200).json({
+    user: {
+      ...req.user,
+      role: req.userRole || 'officer',
+    },
+  });
 });
 
 // 7. Get Officer Profile
@@ -430,8 +437,13 @@ app.get('/api/daily-brief', authenticateSession, async (req: AuthenticatedReques
   }
 });
 
-// Network Analysis (Proxy to Python Backend)
-app.get('/api/network/analyze', authenticateSession, async (req: AuthenticatedRequest, res) => {
+// Network Analysis (Proxy to Python Backend - Restricted to analysts, investigators, supervisors, admin)
+app.get(
+  '/api/network/analyze',
+  authenticateSession,
+  attachUserRole,
+  requireRoles(['analysts', 'investigators', 'supervisors']),
+  async (req: RoleAwareRequest, res) => {
   try {
     const pythonBackendUrl = getPythonUrl('/api/network/analyze');
     const response = await fetch(pythonBackendUrl);
@@ -514,7 +526,7 @@ app.get('/api/system/status', authenticateSession, async (req: AuthenticatedRequ
   }
 });
 
-// Station coordinates for spatial jittering of cases/incidents
+// Station coordinates for spatial jittering of cases/incidents across Karnataka
 const stationCoordinates: Record<string, [number, number]> = {
   'Koramangala Police Station': [12.9352, 77.6244],
   'Indiranagar Police Station': [12.9719, 77.6412],
@@ -523,6 +535,39 @@ const stationCoordinates: Record<string, [number, number]> = {
   'Ulsoor Police Station': [12.9817, 77.6286],
   'Malleshwaram Police Station': [13.0031, 77.5696],
   'Cubbon Park Police Station': [12.9779, 77.5952],
+  'HSR Layout Police Station': [12.9116, 77.6389],
+  'Electronic City Police Station': [12.8452, 77.6602],
+  'Yelahanka Police Station': [13.1007, 77.5963],
+  'Devaraja Police Station (Mysuru)': [12.3070, 76.6575],
+  'Lakshmipuram Police Station (Mysuru)': [12.2962, 76.6259],
+  'Mangaluru North Police Station': [12.8700, 74.8400],
+  'Mangaluru East Police Station': [12.9155, 74.8619],
+  'Hubballi Suburban Police Station': [15.3607, 75.1291],
+  'Dharwad Town Police Station': [15.4589, 75.0078],
+  'Belagavi City Police Station': [15.8397, 74.5048],
+  'Tilakwadi Police Station (Belagavi)': [15.8327, 74.5086],
+  'Tumakuru Town Police Station': [13.3294, 77.1114],
+  'Kyatsandra Police Station (Tumakuru)': [13.3456, 77.0835],
+  'Shivamogga Town Police Station': [13.9353, 75.5877],
+  'Doddapet Police Station (Shivamogga)': [13.9418, 75.5510],
+  'Ballari Town Police Station': [15.1368, 76.9268],
+  'Brucepet Police Station (Ballari)': [15.1481, 76.9031],
+  'Kalaburagi Station Bazaar Police Station': [17.3145, 76.8537],
+  'Brahampur Police Station (Kalaburagi)': [17.3346, 76.8454],
+  'Davanagere City Police Station': [14.4659, 75.9214],
+  'Chitradurga Town Police Station': [14.2291, 76.4012],
+  'Banashankari Police Station': [12.9254, 77.5468],
+  'Rajajinagar Police Station': [12.9882, 77.5548],
+  'Basavanagudi Police Station': [12.9421, 77.5752],
+  'Vijayanagar Police Station': [12.9718, 77.5328],
+  'Madiwala Police Station': [12.9226, 77.6174],
+  'Peenya Police Station': [13.0324, 77.5214],
+  'Marathahalli Police Station': [12.9569, 77.7011],
+  'Bellandur Police Station': [12.9279, 77.6741],
+  'JP Nagar Police Station': [12.9077, 77.5854],
+  'BTM Layout Police Station': [12.9166, 77.6101],
+  'Yeshwanthpur Police Station': [13.0238, 77.5503],
+  'High Grounds Police Station': [12.9866, 77.5874]
 };
 
 const getJitteredCoords = (stationName: string) => {
@@ -542,6 +587,36 @@ const getJitteredCoords = (stationName: string) => {
     latitude: baseCoords[0] + jitterLat,
     longitude: baseCoords[1] + jitterLng,
   };
+};
+
+const getStationFromCoords = (lat: number, lng: number, fallbackStation?: string): string => {
+  if (isNaN(lat) || isNaN(lng)) return fallbackStation || 'Koramangala Police Station';
+  let minDistance = Infinity;
+  let closestStation = fallbackStation || 'Koramangala Police Station';
+
+  for (const [stationName, coords] of Object.entries(stationCoordinates)) {
+    const dLat = lat - coords[0];
+    const dLng = lng - coords[1];
+    const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+    if (dist < minDistance) {
+      minDistance = dist;
+      closestStation = stationName;
+    }
+  }
+  return closestStation;
+};
+
+const getJurisdictionFromCoords = (lat: number, lng: number): string => {
+  if (lat >= 12.8 && lat <= 13.2 && lng >= 77.4 && lng <= 77.8) return 'Bengaluru City Police';
+  if (lat >= 12.2 && lat <= 12.4 && lng >= 76.5 && lng <= 76.7) return 'Mysuru City Police';
+  if (lat >= 12.8 && lat <= 13.0 && lng >= 74.8 && lng <= 75.0) return 'Mangaluru City Police';
+  if (lat >= 15.2 && lat <= 15.5 && lng >= 75.0 && lng <= 75.2) return 'Hubballi-Dharwad Police';
+  if (lat >= 15.7 && lat <= 16.0 && lng >= 74.4 && lng <= 74.6) return 'Belagavi City Police';
+  if (lat >= 13.2 && lat <= 13.5 && lng >= 77.0 && lng <= 77.2) return 'Tumakuru District Police';
+  if (lat >= 13.8 && lat <= 14.1 && lng >= 75.4 && lng <= 75.7) return 'Shivamogga District Police';
+  if (lat >= 15.0 && lat <= 15.3 && lng >= 76.8 && lng <= 77.1) return 'Ballari District Police';
+  if (lat >= 17.2 && lat <= 17.5 && lng >= 76.7 && lng <= 77.0) return 'Kalaburagi City Police';
+  return 'Karnataka State Police';
 };
 
 // GET /api/cases - Fetch cases for GIS Command Map (Dataset Supabase DB used by LLM, fallback to local cases)
@@ -572,20 +647,25 @@ app.get('/api/cases', authenticateSession, async (req: AuthenticatedRequest, res
         WHERE c.latitude IS NOT NULL AND c.longitude IS NOT NULL
         LIMIT 300
       `);
-      remoteCasemaster = rows.map((r: any) => ({
-        id: `casemaster_${r.casemasterid}`,
-        case_number: r.crimeno || r.caseno || `FIR-REM-${r.casemasterid}`,
-        crime_type: r.crime_type || 'Uncategorized',
-        jurisdiction: 'Bengaluru City Police',
-        police_station: r.police_station || 'Unknown Station',
-        landmark: r.landmark || 'Resolved Location',
-        latitude: parseFloat(r.latitude),
-        longitude: parseFloat(r.longitude),
-        reported_date: r.crimeregistereddate ? new Date(r.crimeregistereddate).toISOString().split('T')[0] : '2026-07-01',
-        status: r.status || 'Active',
-        dataset: 'casemaster',
-        details: r.brieffacts || ''
-      }));
+      remoteCasemaster = rows.map((r: any) => {
+        const lat = parseFloat(r.latitude);
+        const lng = parseFloat(r.longitude);
+        const station = getStationFromCoords(lat, lng, r.police_station);
+        return {
+          id: `casemaster_${r.casemasterid}`,
+          case_number: r.crimeno || r.caseno || `FIR-REM-${r.casemasterid}`,
+          crime_type: r.crime_type || 'Uncategorized',
+          jurisdiction: getJurisdictionFromCoords(lat, lng),
+          police_station: station,
+          landmark: r.landmark || 'Resolved Location',
+          latitude: lat,
+          longitude: lng,
+          reported_date: r.crimeregistereddate ? new Date(r.crimeregistereddate).toISOString().split('T')[0] : '2026-07-01',
+          status: r.status || 'Active',
+          dataset: 'casemaster',
+          details: r.brieffacts || ''
+        };
+      });
     } catch (err: any) {
       console.error('Failed to fetch casemaster rows:', err.message || err);
     }
@@ -600,12 +680,13 @@ app.get('/api/cases', authenticateSession, async (req: AuthenticatedRequest, res
       `);
       activeCasesList = rows.map((r: any, idx: number) => {
         const { latitude, longitude } = getJitteredCoords(r.station_name);
+        const station = getStationFromCoords(latitude, longitude, r.station_name);
         return {
           id: `active_${r.fir_number || idx}`,
           case_number: r.fir_number || r.cr_number || `ACT-${idx}`,
           crime_type: r.type || 'Active Case',
-          jurisdiction: 'Bengaluru City Police',
-          police_station: r.station_name || 'Koramangala Police Station',
+          jurisdiction: getJurisdictionFromCoords(latitude, longitude),
+          police_station: station,
           landmark: r.remarks || 'Briefing Record',
           latitude,
           longitude,
@@ -629,12 +710,13 @@ app.get('/api/cases', authenticateSession, async (req: AuthenticatedRequest, res
       `);
       overnightIncidentsList = rows.map((r: any, idx: number) => {
         const { latitude, longitude } = getJitteredCoords(r.station_name);
+        const station = getStationFromCoords(latitude, longitude, r.station_name);
         return {
           id: `overnight_${r.fir_number || idx}`,
           case_number: r.fir_number || `OVR-${idx}`,
           crime_type: r.type || 'Overnight Incident',
-          jurisdiction: 'Bengaluru City Police',
-          police_station: r.station_name || 'Koramangala Police Station',
+          jurisdiction: getJurisdictionFromCoords(latitude, longitude),
+          police_station: station,
           landmark: r.location || 'Incident Location',
           latitude,
           longitude,
@@ -658,12 +740,13 @@ app.get('/api/cases', authenticateSession, async (req: AuthenticatedRequest, res
       `);
       repeatOffendersList = rows.map((r: any, idx: number) => {
         const { latitude, longitude } = getJitteredCoords(r.station_name);
+        const station = getStationFromCoords(latitude, longitude, r.station_name);
         return {
           id: `offender_${r.name || idx}`,
           case_number: r.name || `Offender-${idx}`,
           crime_type: 'Repeat Offender',
-          jurisdiction: 'Bengaluru City Police',
-          police_station: r.station_name || 'Koramangala Police Station',
+          jurisdiction: getJurisdictionFromCoords(latitude, longitude),
+          police_station: station,
           landmark: r.address || 'Last Known Address',
           latitude,
           longitude,
@@ -717,6 +800,12 @@ app.use('/api/ai', authenticateSession, aiRouter);
 // Mount Admin RBAC & User Management routes
 app.use('/api/admin', authenticateSession, attachUserRole, adminRouter);
 
+// Mount Investigator Decision Support routes
+app.use('/api/decision-support', authenticateSession, attachUserRole, decisionSupportRouter);
+
+// Mount Network Analysis & Entity Resolution routes
+app.use('/api', entityResolutionRouter);
+
 // Serve static client assets from dist/public (built Vite output)
 const publicDir = path.join(process.cwd(), 'dist/public');
 if (fs.existsSync(publicDir)) {
@@ -736,7 +825,8 @@ app.get('*', (req, res, next) => {
 });
 
 // Initialize DB and start the server
-initDb().then(() => {
+initDb().then(async () => {
+  await initNetworkSchema();
   // Setup daily briefing cron job at 2:45 PM
   cron.schedule('57 14 * * *', async () => {
     console.log('Running scheduled task: Generate Daily Briefing');

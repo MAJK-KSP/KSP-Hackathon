@@ -57,3 +57,29 @@ export const requireAdmin = async (
   }
   next();
 };
+
+/**
+ * Flexible middleware that restricts access to specified roles.
+ * Admins automatically bypass role restriction.
+ * Must be used AFTER attachUserRole middleware.
+ */
+export const requireRoles = (allowedRoles: string[]) => {
+  return (req: RoleAwareRequest, res: Response, next: NextFunction) => {
+    const role = (req.userRole || 'officer').toLowerCase();
+    
+    // Admin role has unrestricted access to all endpoints
+    if (role === 'admin') {
+      return next();
+    }
+    
+    const normalizedAllowed = allowedRoles.map((r) => r.toLowerCase());
+    if (!normalizedAllowed.includes(role)) {
+      return res.status(403).json({
+        error: `Forbidden: Access requires one of the following roles: ${allowedRoles.join(', ')}`,
+      });
+    }
+    
+    next();
+  };
+};
+
