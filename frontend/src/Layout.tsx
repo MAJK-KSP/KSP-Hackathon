@@ -52,10 +52,6 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
 
   return (
     <div className="dash-page-wrapper">
-      <div className="top-banners">
-        <div className="karnataka-strip"></div>
-        <div className="national-strip"></div>
-      </div>
       <div className="dash-layout">
         {/* Fixed Left Sidebar */}
         <aside className="dash-sidebar">
@@ -182,10 +178,46 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
 
         {/* Main Content Area */}
         <div className={`main-workspace ${location.pathname === '/chat' ? 'chat-page-active' : ''}`}>
+          {/* Top Banners Aligned with Main Workspace */}
+          <div className="top-banners" style={{ position: 'sticky', top: 0, zIndex: 95 }}>
+            <div className="karnataka-strip"></div>
+            <div className="national-strip"></div>
+          </div>
+
           {/* Topbar */}
           <div className="workspace-topbar">
-            <div className="page-title">
+            <div className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <h2>{getPageTitle()}</h2>
+              {user && (
+                <span className="topbar-role-badge" style={{
+                  background: (user.role || 'officer') === 'admin'
+                    ? 'linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%)'
+                    : (user.role || 'officer') === 'supervisors'
+                    ? 'linear-gradient(135deg, #7c3aed 0%, #581c87 100%)'
+                    : (user.role || 'officer') === 'investigators'
+                    ? 'linear-gradient(135deg, #0b1e36 0%, #1e3a8a 100%)'
+                    : (user.role || 'officer') === 'analysts'
+                    ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
+                    : (user.role || 'officer') === 'policymakers'
+                    ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
+                    : 'linear-gradient(135deg, #334155 0%, #1e293b 100%)',
+                  color: '#ffffff',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '20px',
+                  padding: '3px 12px',
+                  fontSize: '0.72rem',
+                  fontWeight: 900,
+                  letterSpacing: '0.8px',
+                  textTransform: 'uppercase',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.25)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <span>🛡️</span>
+                  <span>{(user.role || 'officer').toUpperCase()}</span>
+                </span>
+              )}
             </div>
 
             <div className="topbar-actions" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>

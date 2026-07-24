@@ -274,9 +274,28 @@ adminRouter.get('/rbac-audit-logs', requireAdmin, async (req: RoleAwareRequest, 
       LIMIT 100
     `);
 
-    return res.status(200).json({ success: true, logs });
+    // Verify signatures dynamically
+    const hmacSecret = process.env.HMAC_SECRET || 'ksp-secure-rbac-audit-secret-2026';
+    const verifiedLogs = logs.map(log => {
+      const messageToSign = `${log.performed_by}:${log.action}:${log.target_user_id}:${log.target_email}:${log.assigned_role}:${log.created_at}`;
+      const expectedSignature = crypto.createHmac('sha256', hmacSecret).update(messageToSign).digest('hex');
+      const isValid = log.cryptographic_signature === expectedSignature;
+      return { ...log, signature_valid: isValid };
+    });
+
+    return res.status(200).json({ success: true, logs: verifiedLogs });
   } catch (error: any) {
     console.error('Error fetching RBAC audit logs:', error);
     return res.status(500).json({ error: 'Internal server error fetching RBAC audit logs' });
   }
 });
+
+/**
+ * GET /api/admin/permissions-matrix
+ * Returns the active 6-role permission matrix for UI rendering.
+ */
+adminRouter.get('/permissions-matrix', requireAdmin, async (_req: RoleAwareRequest, res: Response) => {
+  const { ROLE_PERMISSIONS } = await import('../middleware/role');
+  return res.status(200).json({ success: true, permissions: ROLE_PERMISSIONS });
+});
+

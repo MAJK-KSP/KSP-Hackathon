@@ -25,6 +25,7 @@ interface Case {
   status: string;
   dataset?: string;
   details?: string;
+  investigating_officer?: string;
 }
 
 export const GisMap: React.FC = () => {
@@ -64,6 +65,25 @@ export const GisMap: React.FC = () => {
   const mapRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const canvasLayerRef = useRef<L.Layer | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Fetch full case details on-demand from /api/cases/:id
+  const fetchCaseDetails = useCallback(async (c: Case) => {
+    setSelectedCase(c); // Show immediately with available data
+    if (c.details) return; // Already have details
+    try {
+      const lookupId = c.id.startsWith('cm_') ? c.id : (c.case_number || c.id);
+      const res = await fetch(`/api/cases/${encodeURIComponent(lookupId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.case) {
+          setSelectedCase(prev => prev && prev.id === c.id ? { ...prev, details: data.case.details, investigating_officer: data.case.investigating_officer } : prev);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load case details:', err);
+    }
+  }, []);
 
   // Load cases from API
   useEffect(() => {
@@ -368,7 +388,7 @@ export const GisMap: React.FC = () => {
             `;
             marker.bindPopup(popupHtml, { minWidth: 220 });
             marker.on('click', () => {
-              setSelectedCase(c);
+              fetchCaseDetails(c);
             });
             markersLayer.addLayer(marker);
           } else {
@@ -408,15 +428,22 @@ export const GisMap: React.FC = () => {
       };
 
       drawMarkers();
-      map.on('zoomend', drawMarkers);
-      map.on('moveend', drawMarkers);
+
+      // Debounced redraw on zoom/pan — waits 150ms after user stops moving
+      const debouncedDraw = () => {
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = setTimeout(drawMarkers, 150);
+      };
+      map.on('zoomend', debouncedDraw);
+      map.on('moveend', debouncedDraw);
 
       return () => {
-        map.off('zoomend', drawMarkers);
-        map.off('moveend', drawMarkers);
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        map.off('zoomend', debouncedDraw);
+        map.off('moveend', debouncedDraw);
       };
     } else {
-      // Heatmap view using HTML5 Canvas
+      // Heatmap view using HTML5 Canvas with Additive Radial Blending & Dynamic Zoom Radius
       const CustomCanvasLayer = L.Layer.extend({
         onAdd: function(map: L.Map) {
           const pane = map.getPane('overlayPane')!;
@@ -427,36 +454,58 @@ export const GisMap: React.FC = () => {
           container.height = size.y;
           pane.appendChild(container);
           map.on('move', this._update, this);
+          map.on('zoomend', this._update, this);
           this._update();
         },
         onRemove: function(map: L.Map) {
           L.DomUtil.remove(this._canvas);
           map.off('move', this._update, this);
+          map.off('zoomend', this._update, this);
         },
         _update: function() {
           const canvas = this._canvas;
+          if (!canvas) return;
           const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+
           const size = map.getSize();
+          canvas.width = size.x;
+          canvas.height = size.y;
           const topLeft = map.containerPointToLayerPoint([0, 0]);
           L.DomUtil.setPosition(canvas, topLeft);
           ctx.clearRect(0, 0, size.x, size.y);
 
+          if (!filteredCases || filteredCases.length === 0) return;
+
+          const currentZoom = map.getZoom();
+          // Small, crisp epicenter radius (no big covering circles)
+          const radius = currentZoom <= 8 ? 10 : currentZoom <= 12 ? 14 : 18;
+
+          ctx.save();
+          ctx.globalCompositeOperation = 'source-over';
+
           filteredCases.forEach(c => {
             const latlng = L.latLng(c.latitude, c.longitude);
-            const containerPoint = map.latLngToContainerPoint(latlng);
-            const radius = 35;
-            const gradient = ctx.createRadialGradient(
-              containerPoint.x, containerPoint.y, 2,
-              containerPoint.x, containerPoint.y, radius
-            );
-            gradient.addColorStop(0, 'rgba(168, 35, 41, 0.45)');
-            gradient.addColorStop(0.5, 'rgba(168, 35, 41, 0.15)');
-            gradient.addColorStop(1, 'rgba(168, 35, 41, 0)');
-            ctx.fillStyle = gradient;
+            const pt = map.latLngToContainerPoint(latlng);
+
+            // Skip points outside current canvas bounds
+            if (pt.x < -radius || pt.x > size.x + radius || pt.y < -radius || pt.y > size.y + radius) {
+              return;
+            }
+
+            const radGrad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, radius);
+            radGrad.addColorStop(0.0, 'rgba(220, 38, 38, 0.95)');   // Sharp red epicenter dot
+            radGrad.addColorStop(0.25, 'rgba(239, 68, 68, 0.65)');  // Inner heat aura
+            radGrad.addColorStop(0.60, 'rgba(245, 158, 11, 0.28)');  // Warm amber transition
+            radGrad.addColorStop(1.00, 'rgba(245, 158, 11, 0.00)');  // Slowly transparent near edges
+
+            ctx.fillStyle = radGrad;
             ctx.beginPath();
-            ctx.arc(containerPoint.x, containerPoint.y, radius, 0, Math.PI * 2);
+            ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
             ctx.fill();
           });
+
+          ctx.restore();
         }
       });
 
@@ -528,6 +577,36 @@ export const GisMap: React.FC = () => {
               🔥 {t("Heatmap Density")}
             </button>
           </div>
+
+          {/* Heatmap Intensity Legend Overlay */}
+          {viewMode === 'heatmap' && (
+            <div style={{
+              position: 'absolute',
+              bottom: '24px',
+              left: '24px',
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '8px',
+              padding: '8px 12px',
+              zIndex: 400,
+              boxShadow: '0 4px 12px rgba(15, 23, 42, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              color: '#0f172a'
+            }}>
+              <span>🔥 {t("Crime Heat Density")}:</span>
+              <div style={{
+                width: '120px',
+                height: '10px',
+                borderRadius: '5px',
+                background: 'linear-gradient(to right, rgba(56, 189, 248, 0.6), rgba(245, 158, 11, 0.8), rgba(239, 68, 68, 0.95))'
+              }}></div>
+              <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Low &rarr; Hotspot</span>
+            </div>
+          )}
         </div>
 
         {/* Right Side: Map Controls & Side Panel Dashboard */}

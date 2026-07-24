@@ -128,7 +128,6 @@ const dictionary: Record<string, string> = {
   "SQL DATABASE CONNECTED": "ಎಸ್‌ಕ್ಯೂಎಲ್ ಡೇಟಾಬೇಸ್ ಸಂಪರ್ಕಗೊಂಡಿದೆ",
   "UNDER ACTIVE INVESTIGATION": "ಸಕ್ರಿಯ ತನಿಖೆಯಲ್ಲಿದೆ",
   "Lead Officer": "ಮುಖ್ಯ ತನಿಖಾಧಿಕಾರಿ",
-  "Police Station": "ಪೊಲೀಸ್ ಠಾಣೆ",
   "Crime Classification": "ಅಪರಾಧದ ವರ್ಗೀಕರಣ",
   "Incident Landmark": "ಘಟನೆಯ ಹೆಗ್ಗುರುತು",
   "Registration Timestamp": "ನೊಂದಣಿ ಸಮಯ",

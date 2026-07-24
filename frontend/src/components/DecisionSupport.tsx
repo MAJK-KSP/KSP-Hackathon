@@ -359,7 +359,6 @@ const DecisionSupportContent: React.FC = () => {
             <div style={{
               background: '#f8fafc',
               border: '1px solid #e2e8f0',
-              borderLeft: '5px solid #c5a059',
               padding: '1.4rem 1.65rem',
               borderRadius: '10px'
             }}>
@@ -406,7 +405,6 @@ const DecisionSupportContent: React.FC = () => {
                   <div key={idx} style={{
                     background: '#fef2f2',
                     border: '1px solid #fca5a5',
-                    borderLeft: '4px solid #ef4444',
                     padding: '1rem 1.2rem',
                     borderRadius: '8px',
                     marginBottom: '0.75rem'
@@ -455,7 +453,6 @@ const DecisionSupportContent: React.FC = () => {
                     <div key={idx} style={{
                       background: '#eff6ff',
                       border: '1px solid #bfdbfe',
-                      borderLeft: '4px solid #3b82f6',
                       padding: '0.85rem 1.1rem',
                       borderRadius: '8px',
                       marginBottom: '0.5rem'
@@ -474,7 +471,6 @@ const DecisionSupportContent: React.FC = () => {
                     <div key={idx} style={{
                       background: '#ecfdf5',
                       border: '1px solid #a7f3d0',
-                      borderLeft: '4px solid #10b981',
                       padding: '0.85rem 1.1rem',
                       borderRadius: '8px',
                       marginBottom: '0.5rem'

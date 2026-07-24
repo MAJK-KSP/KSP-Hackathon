@@ -210,7 +210,7 @@ async def chat_with_db(request: ChatRequest):
         greeting_patterns = ['hello', 'hi', 'hey', 'thanks', 'thank you', 'ok', 'okay', 'bye', 'good', 'great', 'nice', 'cool', 'sure', 'yes', 'no', 'got it']
         is_greeting = any(msg_lower.startswith(g) or msg_lower == g for g in greeting_patterns) and len(msg_lower) < 50
         if not is_greeting:
-            prompt_message += "\n\n[Core Database Tables (10,000+ records): casemaster (10k FIRs), accused (13.3k suspects), employee (120 officers), unit (40 stations), district (10 districts), complainantdetails (10k), victim (10k), chargesheetdetails (2.5k), arrestsurrender (6k), crimehead, section. Use execute_select_query tool.]"
+            prompt_message += "\n\n[Full Database Schema Access: You have direct SELECT access to all database tables: casemaster (historical dataset of 10,000 FIR cases), unit, crimehead, accused, complainantdetails, victim, employee, casestatusmaster, investigation_cases, investigation_suspects, investigation_evidence, investigation_interviews, investigation_locations, investigation_logs, cases, active_cases, overnight_incidents, repeat_offenders, daily_operational_data, officer_profiles, daily_briefings, users, user_roles, sessions, chat_conversations, chat_messages, ai_audit_logs, rbac_audit_logs, ai_dataset_registry. Use the execute_select_query tool to query any of these tables.]"
 
     async def event_generator():
         queue = asyncio.Queue()

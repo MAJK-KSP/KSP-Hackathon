@@ -28,6 +28,7 @@ export interface RbacAuditLog {
   assigned_role: string;
   created_at: string;
   cryptographic_signature: string;
+  signature_valid?: boolean;
 }
 
 export const UserManagement: React.FC = () => {
@@ -315,7 +316,7 @@ export const UserManagement: React.FC = () => {
           </table>
         </div>
       ) : (
-        /* Cryptographic Audit Trail Table */
+        /* Audit Trail Table */
         <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.825rem' }}>
             <thead>
@@ -325,13 +326,12 @@ export const UserManagement: React.FC = () => {
                 <th style={{ padding: '14px 16px' }}>{t('Target User')}</th>
                 <th style={{ padding: '14px 16px' }}>{t('Role')}</th>
                 <th style={{ padding: '14px 16px' }}>{t('Timestamp')}</th>
-                <th style={{ padding: '14px 16px' }}>{t('HMAC SHA-256 Signature')}</th>
               </tr>
             </thead>
             <tbody>
               {auditLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>
                     {t('No RBAC audit logs recorded yet.')}
                   </td>
                 </tr>
@@ -354,9 +354,6 @@ export const UserManagement: React.FC = () => {
                     </td>
                     <td style={{ padding: '12px 16px', color: '#64748b' }}>
                       {formatDate(log.created_at)}
-                    </td>
-                    <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '0.75rem', color: '#0284c7' }}>
-                      {log.cryptographic_signature.substring(0, 20)}...
                     </td>
                   </tr>
                 ))

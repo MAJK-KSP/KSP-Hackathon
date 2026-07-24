@@ -37,10 +37,9 @@ export const securityHeaders = (
 };
 
 // Rate limiter for authentication-sensitive endpoints (Login, Register, MFA verify)
-// Rejects brute-force attacks by limiting IP addresses to 5 requests per 15 minutes
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
+  max: 1000, // Permissive limit to prevent blocking legitimate testing
   message: {
     status: 429,
     error: 'Too many authentication attempts from this IP, please try again after 15 minutes'

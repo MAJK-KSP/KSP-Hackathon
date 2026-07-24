@@ -44,7 +44,7 @@ def get_db_connection():
                 url = f"{prefix}{user}:{encoded_pwd}@{host_db}"
                 logger.info("Automatically URL-encoded special characters in the database password.")
     
-    return psycopg.connect(url, row_factory=dict_row, connect_timeout=3)
+    return psycopg.connect(url, row_factory=dict_row, connect_timeout=10)
 
 def get_auth_db_connection():
     """Get a direct connection to the Authorization database."""
@@ -65,7 +65,7 @@ def get_auth_db_connection():
                 encoded_pwd = urllib.parse.quote_plus(decoded_pwd)
                 url = f"{prefix}{user}:{encoded_pwd}@{host_db}"
     
-    return psycopg.connect(url, row_factory=dict_row, connect_timeout=3)
+    return psycopg.connect(url, row_factory=dict_row, connect_timeout=10)
 
 
 def init_db():

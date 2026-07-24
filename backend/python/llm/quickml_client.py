@@ -121,16 +121,36 @@ class ZohoQuickMLTransport(httpx.AsyncHTTPTransport):
             if not images_list:
                 images_list = ["iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="]
             
-            if len(prompt_parts) == 1 and prompt_parts[0].startswith("User: "):
-                prompt = prompt_parts[0][len("User: "):]
-            else:
-                prompt = "\n".join(prompt_parts)
+            # Check if history already contains a tool result
+            tool_outputs = [msg.get("content", "") for msg in messages if msg.get("role") in ("tool", "function")]
+            user_messages = [msg.get("content", "") for msg in messages if msg.get("role") == "user"]
+            last_user_msg = user_messages[-1] if user_messages else ""
+            if isinstance(last_user_msg, list):
+                last_user_msg = " ".join([p.get("text", "") for p in last_user_msg if isinstance(p, dict) and p.get("type") == "text"])
 
-            # When there is multi-turn history AND no tool result yet in this turn,
-            # inject a tool reminder so the model doesn't forget its database tools
-            has_tool_result = any(msg.get("role") in ("tool", "function") for msg in messages)
-            if len(prompt_parts) > 1 and not has_tool_result:
-                prompt += "\n\n[IMPORTANT REMINDER: You MUST use the execute_select_query tool to query the database. Write the SQL inside <execute_select_query>YOUR SQL HERE</execute_select_query> tags. Do NOT answer from general knowledge.]"
+            tool_instruction = "\n\nCRITICAL TOOL INSTRUCTION: You are connected to a live PostgreSQL database tool 'execute_select_query'. For any question about cases, FIR numbers, police stations, suspects, officers, or data, you MUST write an SQL SELECT query inside <execute_select_query>YOUR SELECT QUERY HERE</execute_select_query> tags to retrieve the data. Do NOT reply with generic text."
+            if not system_prompt or system_prompt == "Be concise and factual.":
+                system_prompt = "You are the KSP Command Intelligence Assistant." + tool_instruction
+            else:
+                system_prompt += tool_instruction
+
+            if tool_outputs:
+                combined_db_data = "\n\n".join([str(out) for out in tool_outputs if out])
+                prompt = (
+                    f"USER QUESTION: {last_user_msg}\n\n"
+                    f"RETRIEVED POSTGRESQL DATABASE RECORDS:\n{combined_db_data}\n\n"
+                    f"EXECUTIVE REPORT INSTRUCTIONS:\n"
+                    f"Provide a polished, professional police intelligence report answering the user's question using the retrieved database records above.\n"
+                    f"Present all retrieved FIR details, police station names, crime categories, suspect profiles, and brief facts.\n"
+                    f"DO NOT print raw debugging text or internal SQL log commentary like '0 Rows Returned. The casemaster table was queried'. If an exact FIR is not found, state that and present the active/historical FIR records for that station from the retrieved database data."
+                )
+            else:
+                if len(prompt_parts) == 1 and prompt_parts[0].startswith("User: "):
+                    prompt = prompt_parts[0][len("User: "):]
+                else:
+                    prompt = "\n".join(prompt_parts)
+
+                prompt += "\n\n[INSTRUCTION: To answer this question, generate an SQL SELECT query inside <execute_select_query>SELECT ...</execute_select_query> tags. Query casemaster (joined with unit and crimehead) AND investigation_cases / cases. If searching for a station or FIR, use LIKE on unit.unitname, cases.police_station, and casemaster.caseno.]"
                 
             quickml_data = {
                 "prompt": prompt,

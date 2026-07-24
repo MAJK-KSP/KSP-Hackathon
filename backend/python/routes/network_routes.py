@@ -48,28 +48,65 @@ async def analyze_criminal_network():
                 edges = []
                 added_ids = set()
 
-                # 1. Fetch 20 Recent Active FIR Cases from casemaster
+                # 1. Fetch Recent Investigation FIR Cases
                 cur.execute("""
                     SELECT 
-                        c.casemasterid::text AS case_id,
-                        c.caseno AS case_number,
-                        COALESCE(c.brieffacts, 'Active Investigation Case') AS description,
-                        COALESCE(c.landmark, 'Bengaluru Area') AS location,
-                        COALESCE(ch.crimegroupname, 'CRIME INCIDENT') AS crime_category,
-                        COALESCE(u.unitname, 'KSP Police Station') AS default_station
-                    FROM casemaster c
-                    LEFT JOIN unit u ON c.policestationid = u.unitid
-                    LEFT JOIN crimehead ch ON c.crimemajorheadid = ch.crimeheadid
-                    ORDER BY c.crimeregistereddate DESC NULLS LAST
+                        case_id,
+                        case_number,
+                        COALESCE(description, title) AS description,
+                        COALESCE(location, police_station) AS location,
+                        crime_type AS crime_category,
+                        police_station AS default_station
+                    FROM investigation_cases
+                    ORDER BY incident_date DESC
                     LIMIT 20;
                 """)
                 fir_rows = cur.fetchall()
 
-                fir_ids = [int(f['case_id']) for f in fir_rows if f['case_id'].isdigit()]
+                # Also fetch from casemaster dataset if needed
+                try:
+                    cur.execute("""
+                        SELECT 
+                            c.casemasterid::text AS case_id,
+                            c.caseno AS case_number,
+                            COALESCE(c.brieffacts, 'Historical FIR Case') AS description,
+                            COALESCE(c.landmark, 'Bengaluru Jurisdiction') AS location,
+                            COALESCE(ch.crimegroupname, 'CRIME INCIDENT') AS crime_category,
+                            COALESCE(u.unitname, 'KSP Police Station') AS default_station
+                        FROM casemaster c
+                        LEFT JOIN unit u ON c.policestationid = u.unitid
+                        LEFT JOIN crimehead ch ON c.crimemajorheadid = ch.crimeheadid
+                        ORDER BY c.crimeregistereddate DESC NULLS LAST
+                        LIMIT 20;
+                    """)
+                    cm_rows = cur.fetchall()
+                    for cm in cm_rows:
+                        if not any(x['case_number'] == cm['case_number'] for x in fir_rows):
+                            fir_rows.append(cm)
+                except Exception as cm_err:
+                    logger.warning(f"Note fetching casemaster in network_routes: {cm_err}")
+
+                # Also fetch from cases table if needed
+                if not fir_rows:
+                    cur.execute("""
+                        SELECT 
+                            id AS case_id,
+                            case_number,
+                            landmark AS description,
+                            landmark AS location,
+                            crime_type AS crime_category,
+                            police_station AS default_station
+                        FROM cases
+                        ORDER BY reported_date DESC
+                        LIMIT 20;
+                    """)
+                    fir_rows = cur.fetchall()
+
+                fir_ids = [f['case_id'] for f in fir_rows]
 
                 for f in fir_rows:
                     node_id = f"INC-{f['case_id']}"
-                    station = extract_station_name(f['description'], f['default_station'])
+                    station = f['default_station']
                     added_ids.add(node_id)
 
                     nodes.append({
@@ -107,17 +144,36 @@ async def analyze_criminal_network():
                     })
 
                 if fir_ids:
-                    # 2. Fetch Accused Suspects linked to these FIRs
+                    # 2. Fetch Suspects linked to these FIRs from investigation_suspects & accused table
                     cur.execute("""
                         SELECT 
-                            a.accusedmasterid::text AS accused_id,
-                            a.accusedname,
-                            COALESCE(a.ageyear, 30) AS age,
-                            a.casemasterid::text AS fir_id
-                        FROM accused a
-                        WHERE a.casemasterid = ANY(%s::integer[]);
+                            id AS accused_id,
+                            name AS accusedname,
+                            alias,
+                            status,
+                            case_id AS fir_id
+                        FROM investigation_suspects
+                        WHERE case_id = ANY(%s::text[]);
                     """, (fir_ids,))
                     accused_rows = cur.fetchall()
+
+                    try:
+                        int_fir_ids = [int(x) for x in fir_ids if x.isdigit()]
+                        if int_fir_ids:
+                            cur.execute("""
+                                SELECT 
+                                    a.accusedmasterid::text AS accused_id,
+                                    a.accusedname,
+                                    '' AS alias,
+                                    'Accused in FIR' AS status,
+                                    a.casemasterid::text AS fir_id
+                                FROM accused a
+                                WHERE a.casemasterid = ANY(%s::integer[]);
+                            """, (int_fir_ids,))
+                            db_acc = cur.fetchall()
+                            accused_rows.extend(db_acc)
+                    except Exception as acc_err:
+                        logger.warning(f"Note fetching accused in network_routes: {acc_err}")
 
                     fir_to_accused = {}
 
@@ -130,9 +186,9 @@ async def analyze_criminal_network():
                             nodes.append({
                                 "id": node_id,
                                 "type": "ACCUSED",
-                                "label": a['accusedname'],
+                                "label": f"{a['accusedname']} ({a['alias'] or 'Suspect'})",
                                 "risk_score": 9.2,
-                                "secondary_info": { "age": a['age'], "status": "Suspect in Database FIR" }
+                                "secondary_info": { "status": a['status'], "role": "Named Suspect in Database" }
                             })
 
                         if fir_node_id in added_ids:
@@ -141,7 +197,7 @@ async def analyze_criminal_network():
                                 "source": node_id,
                                 "target": fir_node_id,
                                 "label": "ACCUSED_IN",
-                                "evidence": f"Named prime suspect in database FIR #{a['fir_id']}"
+                                "evidence": f"Named suspect in case {a['fir_id']} (Status: {a['status']})"
                             })
 
                             if fir_node_id not in fir_to_accused:
@@ -211,15 +267,15 @@ async def analyze_criminal_network():
                             })
                             fin_counter += 1
 
-                    # 5. Fetch Victims & Complainants
+                    # 5. Fetch Complainants from investigation_interviews
                     cur.execute("""
                         SELECT 
-                            c.complainantid::text AS comp_id,
-                            c.complainantname,
-                            COALESCE(c.ageyear, 35) AS age,
-                            c.casemasterid::text AS fir_id
-                        FROM complainantdetails c
-                        WHERE c.casemasterid = ANY(%s::integer[]);
+                            id AS comp_id,
+                            interviewee_name AS complainantname,
+                            role,
+                            case_id AS fir_id
+                        FROM investigation_interviews
+                        WHERE case_id = ANY(%s::text[]);
                     """, (fir_ids,))
                     comp_rows = cur.fetchall()
 
@@ -233,7 +289,7 @@ async def analyze_criminal_network():
                                 "type": "VICTIM",
                                 "label": c['complainantname'],
                                 "risk_score": 2.0,
-                                "secondary_info": { "age": c['age'], "role": "Complainant / Informant" }
+                                "secondary_info": { "role": c['role'] }
                             })
                         if fir_node_id in added_ids:
                             edges.append({

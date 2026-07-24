@@ -37,7 +37,7 @@
 
 .network-sidebar {
   flex: 1;
-  border-left: 1px solid rgba(197, 160, 89, 0.3);
+  border: 1px solid rgba(197, 160, 89, 0.2);
   padding: 1.5rem;
   overflow-y: auto;
   background: rgba(11, 30, 54, 0.9);
@@ -149,21 +149,20 @@
   margin: 0;
 }
 
-/* Command Center Feature Control Hub - High Tech Police Theme */
+/* Command Center Feature Control Hub - Executive Pastel Theme */
 .command-center-header-box {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-left: 5px solid #c5a059;
   border-radius: 14px;
   padding: 20px 24px;
   margin-bottom: 24px;
-  box-shadow: 0 4px 16px rgba(11, 30, 54, 0.04);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
 }
 
 .command-center-header-box h2 {
   font-size: 1.35rem;
   font-weight: 800;
-  color: #0b1e36;
+  color: #0f172a;
   margin-bottom: 6px;
   font-family: var(--font-main);
 }
@@ -174,12 +173,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  background: linear-gradient(135deg, #0b1e36 0%, #152c4b 100%);
-  border: 1px solid #c5a059;
+  background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+  border: 1px solid #bae6fd;
   border-radius: 14px;
   padding: 16px 24px;
   margin-bottom: 28px;
-  box-shadow: 0 8px 20px rgba(11, 30, 54, 0.15);
+  box-shadow: 0 4px 16px rgba(2, 132, 199, 0.06);
 }
 
 .clearance-item {
@@ -190,21 +189,22 @@
 }
 
 .clearance-label {
-  color: #c5a059;
-  font-weight: 600;
+  color: #0369a1;
+  font-weight: 700;
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .clearance-value {
-  color: #ffffff;
+  color: #0f172a;
   font-weight: 700;
 }
 
 .clearance-value.role-badge {
-  background: #c5a059;
-  color: #0b1e36;
+  background: #e0f2fe;
+  color: #0284c7;
+  border: 1px solid #bae6fd;
   padding: 3px 10px;
   border-radius: 6px;
   font-size: 0.78rem;
@@ -798,21 +798,11 @@
 }
 
 .cc-briefing-item.priority-urgent {
-  border-left: 4px solid #dc2626;
   background: #fef2f2;
 }
 
 .cc-briefing-item.priority-high {
-  border-left: 4px solid #f59e0b;
   background: #fffbeb;
-}
-
-.cc-briefing-item.priority-normal {
-  border-left: 4px solid #0b1e36;
-}
-
-.cc-briefing-item.priority-low {
-  border-left: 4px solid #94a3b8;
 }
 
 .cc-briefing-item.acknowledged {
@@ -1100,7 +1090,6 @@
 .ds-hero-banner {
   background: linear-gradient(135deg, rgba(11, 30, 54, 0.96) 0%, rgba(7, 15, 25, 0.98) 100%);
   border: 1px solid rgba(197, 160, 89, 0.4);
-  border-left: 5px solid #c5a059;
   border-radius: 14px;
   padding: 1.75rem 2rem;
   margin-bottom: 1.5rem;
@@ -1227,7 +1216,6 @@
 .ds-breakthrough-box {
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 95, 70, 0.2) 100%);
   border: 1px solid rgba(52, 211, 153, 0.4);
-  border-left: 4px solid #10b981;
   padding: 0.85rem 1.1rem;
   border-radius: 6px;
   margin-top: 0.75rem;
@@ -1236,7 +1224,6 @@
 .ds-lead-card {
   background: rgba(7, 15, 25, 0.65);
   border: 1px solid rgba(139, 92, 246, 0.35);
-  border-left: 4px solid #8b5cf6;
   border-radius: 10px;
   padding: 1.25rem;
   margin-bottom: 1rem;
