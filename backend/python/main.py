@@ -13,7 +13,17 @@ from routes.transcribe import router as transcribe_router
 from routes.synthesize import router as synthesize_router
 from routes.network_routes import router as network_router
 from routes.decision_support import router as decision_support_router
+from routes.translate import router as translate_router
 from services.db import init_db
+
+# ---------------------------------------------------------------------------
+# Application Factory
+# ---------------------------------------------------------------------------
+# (lines truncated)
+# ---------------------------------------------------------------------------
+# Routers (registered after app creation below)
+# ---------------------------------------------------------------------------
+
 
 
 # ---------------------------------------------------------------------------
@@ -73,6 +83,7 @@ app.include_router(transcribe_router)
 app.include_router(synthesize_router)
 app.include_router(network_router)
 app.include_router(decision_support_router)
+app.include_router(translate_router)
 
 
 # ---------------------------------------------------------------------------
@@ -189,28 +200,17 @@ async def chat_with_db(request: ChatRequest):
     logger = logging.getLogger("uvicorn.error")
 
     # Reconstruct conversation history for Pydantic AI context-awareness
-    # Limit to last 4 messages to keep context focused and prevent the model
-    # from losing awareness of its tools in long conversations
+    # Keep last 4 messages and truncate assistant turns to 350 chars to remain safely within Zoho QuickML token limits
     recent_history = request.history[-4:] if len(request.history) > 4 else request.history
     model_messages = []
     for h in recent_history:
         if h.role == 'user':
             model_messages.append(ModelRequest(parts=[UserPromptPart(content=h.content)]))
         elif h.role == 'assistant':
-            # Truncate long assistant responses to keep context compact
-            truncated = h.content[:300] + '...' if len(h.content) > 300 else h.content
+            truncated = h.content[:350] + '...' if len(h.content) > 350 else h.content
             model_messages.append(ModelResponse(parts=[TextPart(content=truncated)]))
 
     prompt_message = request.message
-    # When there's conversation history and the message looks like a data question,
-    # inject table names so the model uses correct names in follow-up queries.
-    # Skip for greetings, thanks, and casual messages.
-    if model_messages:
-        msg_lower = request.message.strip().lower()
-        greeting_patterns = ['hello', 'hi', 'hey', 'thanks', 'thank you', 'ok', 'okay', 'bye', 'good', 'great', 'nice', 'cool', 'sure', 'yes', 'no', 'got it']
-        is_greeting = any(msg_lower.startswith(g) or msg_lower == g for g in greeting_patterns) and len(msg_lower) < 50
-        if not is_greeting:
-            prompt_message += "\n\n[Full Database Schema Access: You have direct SELECT access to all database tables: casemaster (historical dataset of 10,000 FIR cases), unit, crimehead, accused, complainantdetails, victim, employee, casestatusmaster, investigation_cases, investigation_suspects, investigation_evidence, investigation_interviews, investigation_locations, investigation_logs, cases, active_cases, overnight_incidents, repeat_offenders, daily_operational_data, officer_profiles, daily_briefings, users, user_roles, sessions, chat_conversations, chat_messages, ai_audit_logs, rbac_audit_logs, ai_dataset_registry. Use the execute_select_query tool to query any of these tables.]"
 
     async def event_generator():
         queue = asyncio.Queue()
@@ -317,7 +317,3 @@ async def chat_with_db(request: ChatRequest):
             }) + "\n"
 
     return StreamingResponse(event_generator(), media_type="application/x-ndjson")
-
-# Trigger reload comment 6
-
-

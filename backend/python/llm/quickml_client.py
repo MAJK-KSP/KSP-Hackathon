@@ -11,10 +11,10 @@ from config import settings
 import httpx
 import json
 import logging
+import time
+import re
 
 logger = logging.getLogger("uvicorn.error")
-
-import time
 
 _cached_token = None
 _token_expiry = 0
@@ -128,7 +128,7 @@ class ZohoQuickMLTransport(httpx.AsyncHTTPTransport):
             if isinstance(last_user_msg, list):
                 last_user_msg = " ".join([p.get("text", "") for p in last_user_msg if isinstance(p, dict) and p.get("type") == "text"])
 
-            tool_instruction = "\n\nCRITICAL TOOL INSTRUCTION: You are connected to a live PostgreSQL database tool 'execute_select_query'. For any question about cases, FIR numbers, police stations, suspects, officers, or data, you MUST write an SQL SELECT query inside <execute_select_query>YOUR SELECT QUERY HERE</execute_select_query> tags to retrieve the data. Do NOT reply with generic text."
+            tool_instruction = "\n\nCRITICAL TOOL INSTRUCTION: You are connected to a live PostgreSQL database tool 'execute_select_query'. For any question about cases, FIR numbers, police stations, suspects, officers, or data, you MUST write an SQL SELECT query inside <execute_select_query>YOUR SELECT QUERY HERE</execute_select_query> tags to retrieve the data. Do NOT reply with generic text. IMPORTANT: To burn minimum tokens, ALWAYS SELECT only specific columns needed, ALWAYS use WHERE clauses to filter exactly what is asked, and ALWAYS append LIMIT 5."
             if not system_prompt or system_prompt == "Be concise and factual.":
                 system_prompt = "You are the KSP Command Intelligence Assistant." + tool_instruction
             else:
@@ -136,21 +136,29 @@ class ZohoQuickMLTransport(httpx.AsyncHTTPTransport):
 
             if tool_outputs:
                 combined_db_data = "\n\n".join([str(out) for out in tool_outputs if out])
-                prompt = (
-                    f"USER QUESTION: {last_user_msg}\n\n"
-                    f"RETRIEVED POSTGRESQL DATABASE RECORDS:\n{combined_db_data}\n\n"
-                    f"EXECUTIVE REPORT INSTRUCTIONS:\n"
-                    f"Provide a polished, professional police intelligence report answering the user's question using the retrieved database records above.\n"
-                    f"Present all retrieved FIR details, police station names, crime categories, suspect profiles, and brief facts.\n"
-                    f"DO NOT print raw debugging text or internal SQL log commentary like '0 Rows Returned. The casemaster table was queried'. If an exact FIR is not found, state that and present the active/historical FIR records for that station from the retrieved database data."
-                )
+                if "Database Error:" in combined_db_data or "ERROR:" in combined_db_data:
+                    prompt = (
+                        f"USER QUESTION: {last_user_msg}\n\n"
+                        f"DATABASE LOGS:\n{combined_db_data}\n\n"
+                        f"INSTRUCTIONS:\n"
+                        f"The database query failed or returned an error. Inform the user conversationally that there was a technical error retrieving the data. Mention what the error was (e.g., missing column) so they know why it failed. Do not write a police report."
+                    )
+                else:
+                    prompt = (
+                        f"USER QUESTION: {last_user_msg}\n\n"
+                        f"RETRIEVED POSTGRESQL DATABASE RECORDS:\n{combined_db_data}\n\n"
+                        f"EXECUTIVE REPORT INSTRUCTIONS:\n"
+                        f"Provide a polished, professional police intelligence report answering the user's question using the retrieved database records above.\n"
+                        f"Present all retrieved FIR details, police station names, crime categories, suspect profiles, and brief facts.\n"
+                        f"DO NOT print raw debugging text or internal SQL log commentary like '0 Rows Returned. The casemaster table was queried'. If an exact FIR is not found, state that and present the active/historical FIR records for that station from the retrieved database data."
+                    )
             else:
                 if len(prompt_parts) == 1 and prompt_parts[0].startswith("User: "):
                     prompt = prompt_parts[0][len("User: "):]
                 else:
                     prompt = "\n".join(prompt_parts)
 
-                prompt += "\n\n[INSTRUCTION: To answer this question, generate an SQL SELECT query inside <execute_select_query>SELECT ...</execute_select_query> tags. Query casemaster (joined with unit and crimehead) AND investigation_cases / cases. If searching for a station or FIR, use LIKE on unit.unitname, cases.police_station, and casemaster.caseno.]"
+                prompt += "\n\n[INSTRUCTION: To answer this question, generate an efficient SQL SELECT query inside <execute_select_query>SELECT ...</execute_select_query> tags. Query CaseMaster (joined with Unit, CrimeHead, Accused, Victim, etc. as needed). If searching for a station or FIR, use exact filtering in WHERE clauses on Unit.UnitName, and CaseMaster.CaseNo or CaseMaster.CrimeNo. Only SELECT the columns required to answer the question. ALWAYS use LIMIT 5 to avoid maximum length errors.]"
                 
             quickml_data = {
                 "prompt": prompt,
@@ -200,8 +208,6 @@ class ZohoQuickMLTransport(httpx.AsyncHTTPTransport):
                             generated_text = val
                             break
                             
-                import re
-                
                 # Check if history already contains a tool result
                 has_tool_result = any(msg.get("role") in ("tool", "function") for msg in messages)
                 
@@ -229,19 +235,6 @@ class ZohoQuickMLTransport(httpx.AsyncHTTPTransport):
                     m3 = re.search(r"execute_select_query\(\s*(?:(?:query|sql)\s*=\s*)?[\"'](.*?)[\"']\s*\)", generated_text, re.DOTALL | re.IGNORECASE)
                     if m3:
                         sql_query = m3.group(1).strip()
-
-                # Fallback formats (only if no tool result exists in history yet)
-                if not sql_query and not has_tool_result:
-                    # Format 4: ```sql SELECT ... ```
-                    m4 = re.search(r"```(?:sql)?\s*(.*?)\s*```", generated_text, re.DOTALL | re.IGNORECASE)
-                    if m4:
-                        sql_query = m4.group(1).strip()
-
-                    # Format 5: Raw SELECT / WITH statement
-                    if not sql_query:
-                        m5 = re.search(r"\b(SELECT|WITH)\b[\s\S]+?(?:;|$)", generated_text, re.IGNORECASE)
-                        if m5 and ("FROM" in generated_text.upper()):
-                            sql_query = m5.group(0).strip()
 
                 if sql_query:
                     openai_data = {
@@ -271,6 +264,8 @@ class ZohoQuickMLTransport(httpx.AsyncHTTPTransport):
                         ]
                     }
                 else:
+                    # PydanticAI requires non-empty content — provide a fallback
+                    fallback_text = generated_text if generated_text.strip() else "I couldn't process that request right now. Could you please rephrase your question?"
                     openai_data = {
                         "id": "zoho-quickml-msg",
                         "object": "chat.completion",
@@ -281,7 +276,7 @@ class ZohoQuickMLTransport(httpx.AsyncHTTPTransport):
                                 "index": 0,
                                 "message": {
                                     "role": "assistant",
-                                    "content": generated_text
+                                    "content": fallback_text
                                 },
                                 "finish_reason": "stop"
                             }
