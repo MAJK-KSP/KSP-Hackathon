@@ -4,7 +4,7 @@
  * Ensures all system features (Overview, User Management, GIS Command Map, Network Analysis, AI Assistant, Decision Support, Profile, Settings) are ALWAYS visible and accessible in the sidebar.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from './LanguageContext';
 
@@ -23,9 +23,13 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { t, locale, toggleLanguage } = useLanguage();
+
+  const userRole = user?.role || 'officer';
+  const hasAccess = (allowedRoles: string[]) => allowedRoles.includes(userRole);
 
   const getPageTitle = () => {
     switch (location.pathname) {
@@ -53,100 +57,131 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
   return (
     <div className="dash-page-wrapper">
       <div className="dash-layout">
+        {/* Mobile Sidebar Overlay */}
+        {isMobileMenuOpen && (
+          <div className="mobile-sidebar-overlay" onClick={() => setIsMobileMenuOpen(false)}></div>
+        )}
+
         {/* Fixed Left Sidebar */}
-        <aside className="dash-sidebar">
-          {/* Top: Branding */}
+        <aside className={`dash-sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
+          {/* Top: Branding Card */}
           <div className="sidebar-brand" onClick={() => navigate('/dashboard')} style={{ cursor: 'pointer' }}>
-            <svg className="ksp-logo-header" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="46" height="46">
-              <circle cx="100" cy="100" r="95" fill="#0b1e36" stroke="#c5a059" strokeWidth="4" />
-              <circle cx="100" cy="100" r="76" fill="none" stroke="#c5a059" strokeWidth="1.5" strokeDasharray="4 2" />
-              <circle cx="100" cy="100" r="58" fill="#ffffff" stroke="#c5a059" strokeWidth="3" />
-              <path d="M 75,68 C 75,68 88,64 100,58 C 112,64 125,68 125,68 L 125,98 C 125,118 100,132 100,132 C 100,132 75,118 75,98 Z" fill="#a82329" stroke="#c5a059" strokeWidth="2" />
-              <g transform="translate(100, 96) scale(0.7)" fill="#ffe082" stroke="#5c4308" strokeWidth="0.5">
-                <path d="M -8,-15 L 8,-15 C 10,-8 12,5 0,16 C -12,5 -10,-8 -8,-15 Z" />
-                <path d="M -6,-12 C -18,-15 -28,-6 -25,12 C -22,18 -15,14 -10,6 C -7,0 -6,-6 -6,-12 Z" />
-                <path d="M 6,-12 C 18,-15 28,-6 25,12 C 22,18 15,14 10,6 C 7,0 6,-6 6,-12 Z" />
-              </g>
-            </svg>
+            <img 
+              src="/ksp-official-logo.png" 
+              alt="Karnataka State Police Emblem" 
+              style={{ height: '48px', width: 'auto', objectFit: 'contain' }} 
+            />
             <div className="brand-meta">
               <span className="dash-title-main">{t("KARNATAKA STATE POLICE")}</span>
-              <span className="dash-title-sub">{t("SECURE COMMAND TERMINAL")}</span>
             </div>
           </div>
 
-          {/* Middle: Sidebar Navigation (ALL FEATURES ALWAYS VISIBLE) */}
+          {/* Middle: Sidebar Navigation */}
           <nav className="sidebar-nav">
-            <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="7" height="9"></rect>
-                <rect x="14" y="3" width="7" height="5"></rect>
-                <rect x="14" y="12" width="7" height="9"></rect>
-                <rect x="3" y="16" width="7" height="5"></rect>
-              </svg>
-              <span>{t("Overview")}</span>
-            </NavLink>
+            {/* SECTION 1: COMMAND & OPERATIONS */}
+            <div className="nav-section">
+              <div className="nav-section-title">{t("COMMAND & OPERATIONS")}</div>
+              <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="9"></rect>
+                  <rect x="14" y="3" width="7" height="5"></rect>
+                  <rect x="14" y="12" width="7" height="9"></rect>
+                  <rect x="3" y="16" width="7" height="5"></rect>
+                </svg>
+                <span className="nav-item-text">{t("Overview")}</span>
+              </NavLink>
 
-            <NavLink to="/users" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-              <span>{t("User Management")}</span>
-            </NavLink>
+              {hasAccess(['admin', 'supervisors', 'investigators', 'analysts', 'policymakers', 'officer']) && (
+                <NavLink to="/map" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon>
+                    <line x1="9" y1="3" x2="9" y2="18"></line>
+                    <line x1="15" y1="6" x2="15" y2="21"></line>
+                  </svg>
+                  <span className="nav-item-text">{t("GIS Command Map")}</span>
+                </NavLink>
+              )}
 
-            <NavLink to="/map" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon>
-                <line x1="9" y1="3" x2="9" y2="18"></line>
-                <line x1="15" y1="6" x2="15" y2="21"></line>
-              </svg>
-              <span>{t("GIS Command Map")}</span>
-            </NavLink>
+              {hasAccess(['admin', 'supervisors', 'policymakers']) && (
+                <NavLink to="/fir-generator" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                  <span className="nav-item-text">{t("FIR Generator")}</span>
+                </NavLink>
+              )}
+            </div>
 
-            <NavLink to="/network" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="18" cy="5" r="3"></circle>
-                <circle cx="6" cy="12" r="3"></circle>
-                <circle cx="18" cy="19" r="3"></circle>
-                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-              </svg>
-              <span>{t("Network Analysis")}</span>
-            </NavLink>
+            <div className="nav-divider"></div>
 
-            <NavLink to="/chat" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-              </svg>
-              <span>{t("AI Assistant")}</span>
-            </NavLink>
+            {/* SECTION 2: INTELLIGENCE SUITE */}
+            <div className="nav-section">
+              <div className="nav-section-title">{t("INTELLIGENCE SUITE")}</div>
+              
+              {hasAccess(['admin', 'supervisors', 'analysts']) && (
+                <NavLink to="/network" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="18" cy="5" r="3"></circle>
+                    <circle cx="6" cy="12" r="3"></circle>
+                    <circle cx="18" cy="19" r="3"></circle>
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                  </svg>
+                  <span className="nav-item-text">{t("Network Analysis")}</span>
+                </NavLink>
+              )}
 
-            <NavLink to="/decision-support" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                <polyline points="2 17 12 22 22 17"></polyline>
-                <polyline points="2 12 12 17 22 12"></polyline>
-              </svg>
-              <span>{t("Decision Support")}</span>
-            </NavLink>
+              {hasAccess(['admin', 'supervisors', 'investigators']) && (
+                <NavLink to="/decision-support" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                    <polyline points="2 17 12 22 22 17"></polyline>
+                    <polyline points="2 12 12 17 22 12"></polyline>
+                  </svg>
+                  <span className="nav-item-text">{t("Decision Support")}</span>
+                </NavLink>
+              )}
 
-            <NavLink to="/profile" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
-              <span>{t("Officer Profile")}</span>
-            </NavLink>
+              {hasAccess(['admin', 'supervisors', 'investigators', 'analysts', 'policymakers', 'officer']) && (
+                <NavLink to="/chat" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                  </svg>
+                  <span className="nav-item-text">{t("AI Assistant")}</span>
+                </NavLink>
+              )}
+            </div>
 
-            <NavLink to="/settings" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-              </svg>
-              <span>{t("Settings")}</span>
-            </NavLink>
+            <div className="nav-divider"></div>
+
+            {/* SECTION 3: SYSTEM & SECURITY */}
+            <div className="nav-section">
+              <div className="nav-section-title">{t("SYSTEM & SECURITY")}</div>
+              
+              {hasAccess(['admin']) && (
+                <NavLink to="/users" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                  </svg>
+                  <span className="nav-item-text">{t("User Management")}</span>
+                </NavLink>
+              )}
+
+              <NavLink to="/settings" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+                <span className="nav-item-text">{t("Settings")}</span>
+              </NavLink>
+            </div>
           </nav>
 
           {/* Bottom: User Details & Logout */}
@@ -187,6 +222,13 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
           {/* Topbar */}
           <div className="workspace-topbar">
             <div className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <button className="mobile-menu-btn" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="24" height="24">
+                  <line x1="3" y1="12" x2="21" y2="12"></line>
+                  <line x1="3" y1="6" x2="21" y2="6"></line>
+                  <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+              </button>
               <h2>{getPageTitle()}</h2>
               {user && (
                 <span className="topbar-role-badge" style={{

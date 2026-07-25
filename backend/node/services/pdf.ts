@@ -309,30 +309,30 @@ export async function generateConversationPdf(
       doc.fillColor('#111827');
       
       // Left Column Metadata
-      doc.font('Helvetica-Bold').fontSize(9).text('Subject:', 50, metadataTop + 10);
-      doc.font('Helvetica').text(title || 'Untitled Query Session', 110, metadataTop + 10);
+      doc.font('Helvetica-Bold').fontSize(9).text('Subject:', 50, metadataTop + 10, { lineBreak: false });
+      doc.font('Helvetica').text(title || 'Untitled Query Session', 110, metadataTop + 10, { width: 230, height: 12, ellipsis: true });
       
-      doc.font('Helvetica-Bold').text('Date Exported:', 50, metadataTop + 25);
-      doc.font('Helvetica').text(new Date().toLocaleString(), 120, metadataTop + 25);
+      doc.font('Helvetica-Bold').text('Date Exported:', 50, metadataTop + 25, { lineBreak: false });
+      doc.font('Helvetica').text(new Date().toLocaleString(), 120, metadataTop + 25, { width: 220, height: 12, ellipsis: true });
 
-      doc.font('Helvetica-Bold').text('Session ID:', 50, metadataTop + 40);
-      doc.font('Helvetica').text(conversationId, 110, metadataTop + 40);
+      doc.font('Helvetica-Bold').text('Session ID:', 50, metadataTop + 40, { lineBreak: false });
+      doc.font('Helvetica').text(conversationId, 110, metadataTop + 40, { width: 230, height: 12, ellipsis: true });
       
-      doc.font('Helvetica-Bold').text('Officer Account:', 50, metadataTop + 55);
-      doc.font('Helvetica').text(userEmail, 130, metadataTop + 55);
+      doc.font('Helvetica-Bold').text('Officer Account:', 50, metadataTop + 55, { lineBreak: false });
+      doc.font('Helvetica').text(userEmail, 130, metadataTop + 55, { width: 210, height: 12, ellipsis: true });
 
       // Right Column Metadata
-      doc.font('Helvetica-Bold').text('Badge No:', 350, metadataTop + 10);
-      doc.font('Helvetica').text(officerProfile?.badge_number || 'N/A', 410, metadataTop + 10);
+      doc.font('Helvetica-Bold').text('Badge No:', 350, metadataTop + 10, { lineBreak: false });
+      doc.font('Helvetica').text(officerProfile?.badge_number || 'N/A', 410, metadataTop + 10, { width: 140, height: 12, ellipsis: true });
 
-      doc.font('Helvetica-Bold').text('Rank/Post:', 350, metadataTop + 25);
-      doc.font('Helvetica').text(`${officerProfile?.rank || 'Officer'} / ${officerProfile?.post || 'N/A'}`, 410, metadataTop + 25);
+      doc.font('Helvetica-Bold').text('Rank/Post:', 350, metadataTop + 25, { lineBreak: false });
+      doc.font('Helvetica').text(`${officerProfile?.rank || 'Officer'} / ${officerProfile?.post || 'N/A'}`, 410, metadataTop + 25, { width: 140, height: 12, ellipsis: true });
 
-      doc.font('Helvetica-Bold').text('Jurisdiction:', 350, metadataTop + 40);
-      doc.font('Helvetica').text(officerProfile?.jurisdiction || 'Koramangala, South Zone', 420, metadataTop + 40);
+      doc.font('Helvetica-Bold').text('Jurisdiction:', 350, metadataTop + 40, { lineBreak: false });
+      doc.font('Helvetica').text(officerProfile?.jurisdiction || 'Koramangala, South Zone', 420, metadataTop + 40, { width: 130, height: 12, ellipsis: true });
 
-      doc.font('Helvetica-Bold').text('Classification:', 350, metadataTop + 55);
-      doc.font('Helvetica-Bold').fillColor('#b91c1c').text('CONFIDENTIAL', 430, metadataTop + 55);
+      doc.font('Helvetica-Bold').text('Classification:', 350, metadataTop + 55, { lineBreak: false });
+      doc.font('Helvetica-Bold').fillColor('#b91c1c').text('CONFIDENTIAL', 430, metadataTop + 55, { width: 120, height: 12, ellipsis: true });
 
       doc.fillColor('#111827'); // reset fill
       doc.y = metadataTop + 95; // move past metadata box

@@ -761,3 +761,53 @@ aiRouter.get('/role', async (req: RoleAwareRequest, res: Response) => {
     role: req.userRole || 'officer',
   });
 });
+
+/**
+ * POST /api/ai/translate
+ * Proxies text translation requests to the Python Zoho Zia Translate service.
+ */
+aiRouter.post('/translate', async (req: RoleAwareRequest, res: Response) => {
+  try {
+    const { text, target_language, source_language } = req.body;
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ error: 'Text is required for translation' });
+    }
+
+    const pythonUrl = getPythonUrl('/translate');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000);
+
+    try {
+      const pythonResp = await fetch(pythonUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          target_language: target_language || 'kn',
+          source_language: source_language || 'auto',
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (pythonResp.ok) {
+        const data = await pythonResp.json();
+        return res.status(200).json(data);
+      } else {
+        const errText = await pythonResp.text();
+        console.error('Translation service error:', errText);
+        return res.status(pythonResp.status).json({ error: `Translation service error: ${errText}` });
+      }
+    } catch (fetchErr: any) {
+      clearTimeout(timeout);
+      if (fetchErr.name === 'AbortError') {
+        console.error('Translation proxy timed out after 25s');
+        return res.status(504).json({ error: 'Translation service timed out' });
+      }
+      throw fetchErr;
+    }
+  } catch (err: any) {
+    console.error('Translation proxy error:', err);
+    return res.status(500).json({ error: 'Failed to communicate with translation service' });
+  }
+});

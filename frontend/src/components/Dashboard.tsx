@@ -314,10 +314,6 @@ export const Dashboard: React.FC = () => {
       <div className="command-banner-premium">
         <div className="banner-grid-content">
           <div className="banner-branding">
-            <span className="secure-badge">
-              <span className="pulse-dot"></span>
-              {t("SYSTEM STATUS") || "SYSTEM STATUS"}: SECURE & ACTIVE
-            </span>
             <h1 className="banner-main-title">{t("Welcome to Command Terminal")}</h1>
             <p className="banner-subtitle">
               {profile ? `${t(profile.rank) || profile.rank} | ${t(profile.station) || profile.station} | ${t("Badge") || "Badge"}: ${profile.badge_number}` : t("Please configure your officer profile in the Profile settings tab.")}
@@ -557,9 +553,6 @@ export const Dashboard: React.FC = () => {
                       <span className="cc-card-sub">{t('24/7 Investigative Copilot')}</span>
                     </div>
                   </div>
-                  <span className="cc-card-badge assistant-badge">
-                    <span className="pulse-dot"></span> {t('ONLINE')}
-                  </span>
                 </div>
 
                 <div className="cc-card-body assistant-body">

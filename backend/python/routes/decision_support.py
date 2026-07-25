@@ -86,7 +86,7 @@ def _build_active_cases_cache() -> list:
                     LEFT JOIN crimehead ch ON c.crimemajorheadid = ch.crimeheadid
                     LEFT JOIN employee e ON c.policepersonid = e.employeeid
                     ORDER BY c.crimeregistereddate DESC NULLS LAST
-                    LIMIT 1000;
+                    LIMIT 10000;
                 """)
                 for cm in cur.fetchall():
                     cm_dict = dict(cm)
@@ -113,7 +113,7 @@ def _build_active_cases_cache() -> list:
                     'Under Investigation' AS outcome
                 FROM cases
                 ORDER BY reported_date DESC
-                LIMIT 30;
+                LIMIT 10000;
             """)
             for gc in cur.fetchall():
                 gc_dict = dict(gc)

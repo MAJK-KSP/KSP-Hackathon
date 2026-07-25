@@ -7,6 +7,7 @@
 import { Router, Response } from 'express';
 import { RoleAwareRequest, attachUserRole } from '../middleware/role';
 import { getRow, getAllRows } from '../config/db';
+import { auditDataAccess } from '../middleware/audit';
 
 export const decisionSupportRouter = Router();
 
@@ -21,6 +22,7 @@ const getPythonUrl = (endpoint: string): string => {
 };
 
 decisionSupportRouter.use(attachUserRole);
+decisionSupportRouter.use(auditDataAccess('DECISION_SUPPORT'));
 
 /**
  * GET /api/decision-support/active-cases
@@ -39,8 +41,7 @@ decisionSupportRouter.get('/active-cases', async (req: RoleAwareRequest, res: Re
       console.warn('[Node Proxy] Python backend unreachable for /active-cases, executing local database query');
     }
 
-    const cases = await getAllRows(
-      `SELECT 
+    let query = `SELECT 
         c.case_id,
         c.case_number,
         c.title,
@@ -52,9 +53,9 @@ decisionSupportRouter.get('/active-cases', async (req: RoleAwareRequest, res: Re
         c.description,
         c.investigating_officer
        FROM investigation_cases c
-       ORDER BY c.incident_date DESC NULLS LAST
-       LIMIT 30`
-    );
+       ORDER BY c.incident_date DESC NULLS LAST LIMIT 10000`;
+
+    const cases = await getAllRows(query, []);
 
     return res.status(200).json({ success: true, cases });
   } catch (error: any) {
@@ -85,7 +86,8 @@ decisionSupportRouter.get('/case-details/:caseId', async (req: RoleAwareRequest,
       console.warn('[Node Proxy] Python backend unreachable for /case-details, executing local database query');
     }
 
-    const case_info = await getRow<any>(
+    let case_info;
+    case_info = await getRow<any>(
       `SELECT 
         c.case_id,
         c.case_number,
@@ -98,7 +100,7 @@ decisionSupportRouter.get('/case-details/:caseId', async (req: RoleAwareRequest,
         c.description,
         c.investigating_officer
        FROM investigation_cases c
-       WHERE c.case_id = $1 OR c.case_number = $2 OR c.case_number LIKE $3`,
+       WHERE c.case_id = ? OR c.case_number = ? OR c.case_number LIKE ?`,
       [caseId, caseId, `%${caseId}%`]
     );
 

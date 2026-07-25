@@ -81,9 +81,9 @@ function convertPlaceholders(sql: string): string {
 export const runQuery = async (sql: string, params: any[] = []): Promise<{ lastID: number; changes: number }> => {
   const pgSql = convertPlaceholders(sql);
   const result = await pool.query(pgSql, params);
-  return { 
-    lastID: 0, 
-    changes: result.rowCount || 0 
+  return {
+    lastID: 0,
+    changes: result.rowCount || 0
   };
 };
 
@@ -242,6 +242,18 @@ export const initDb = async () => {
       assigned_role TEXT,
       created_at TEXT NOT NULL,
       cryptographic_signature TEXT NOT NULL
+    );
+  `);
+
+  // Case Grants for explicit case access (Decision Support & AI Summary)
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS case_grants (
+      id TEXT PRIMARY KEY,
+      judge_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      case_id TEXT NOT NULL,
+      granted_by UUID NOT NULL REFERENCES users(id),
+      granted_at TEXT NOT NULL,
+      ai_summary TEXT
     );
   `);
 

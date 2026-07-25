@@ -5,8 +5,9 @@
  * Dossier cards below use clean white background with crisp typography & contrast accents.
  */
 
-import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
+import React, { useState, useEffect, Component, ErrorInfo, ReactNode, useMemo } from 'react';
 import { useLanguage } from '../LanguageContext';
+import { DbAutocompleteInput } from './DbAutocompleteInput';
 
 interface CaseItem {
   case_id: string;
@@ -19,6 +20,7 @@ interface CaseItem {
   location: string;
   description: string;
   investigating_officer: string;
+  ai_summary?: string;
 }
 
 interface AccusedPerson {
@@ -92,10 +94,10 @@ const DecisionSupportContent: React.FC = () => {
   // State
   const [activeCases, setActiveCases] = useState<CaseItem[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [loadingCases, setLoadingCases] = useState<boolean>(true);
   const [loadingDetails, setLoadingDetails] = useState<boolean>(false);
   const [caseDetails, setCaseDetails] = useState<CaseDetailsResponse | null>(null);
-
   // Load Active Cases on Mount
   useEffect(() => {
     fetchActiveCases();
@@ -221,15 +223,27 @@ const DecisionSupportContent: React.FC = () => {
           </div>
         </div>
 
-        {/* MASTER SELECTOR: ALL ACTIVE CASES (FROM DATABASE) */}
-        <div style={{ marginTop: '1.5rem', position: 'relative', zIndex: 2 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#c5a059', fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.6rem' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-            </svg>
-            {t("All Active Cases (Only from Database)")}:
-          </label>
-          <div style={{ position: 'relative' }}>
+        {/* MASTER SELECTOR & DB SEARCH BAR */}
+        <div style={{ marginTop: '1.5rem', position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#c5a059', fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.4rem' }}>
+              🔍 {t("Live Database Search Autocomplete")}:
+            </label>
+            <DbAutocompleteInput
+              placeholder={t("Type to search suspect name, FIR number, or crime category...")}
+              value={searchQuery}
+              onChange={(val) => setSearchQuery(val)}
+              onSelectSuggestion={(item) => {
+                const targetCaseId = item.related_case_id || (item.type === 'INCIDENT' ? item.id : null);
+                if (targetCaseId) {
+                  setSelectedCaseId(targetCaseId);
+                  fetchCaseDetails(targetCaseId);
+                }
+              }}
+            />
+          </div>
+
+          <div style={{ position: 'relative', width: '100%', maxWidth: '900px' }}>
             <select
               value={selectedCaseId}
               onChange={(e) => {
@@ -360,7 +374,8 @@ const DecisionSupportContent: React.FC = () => {
               background: '#f8fafc',
               border: '1px solid #e2e8f0',
               padding: '1.4rem 1.65rem',
-              borderRadius: '10px'
+              borderRadius: '10px',
+              marginBottom: currentCase.ai_summary ? '1.5rem' : '0'
             }}>
               <h4 style={{ margin: '0 0 0.6rem 0', color: '#0b1e36', fontSize: '0.98rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c5a059" strokeWidth="2.4">
@@ -375,6 +390,26 @@ const DecisionSupportContent: React.FC = () => {
                 {currentCase.description}
               </p>
             </div>
+
+            {/* AI CASE SUMMARY BOX (IF GRANTED) */}
+            {currentCase.ai_summary && (
+              <div style={{
+                background: '#f0fdfa',
+                border: '1px solid #5eead4',
+                padding: '1.4rem 1.65rem',
+                borderRadius: '10px'
+              }}>
+                <h4 style={{ margin: '0 0 0.6rem 0', color: '#0f766e', fontSize: '0.98rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f766e" strokeWidth="2.4">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                  </svg>
+                  Granted Intelligence: AI Quick-Summary
+                </h4>
+                <p style={{ margin: 0, color: '#115e59', fontSize: '1rem', lineHeight: '1.65', fontWeight: 600, whiteSpace: 'pre-wrap' }}>
+                  {currentCase.ai_summary}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* CARD 2: PERSONS INVOLVED NETWORK GRID (WHITE BACKGROUND) */}

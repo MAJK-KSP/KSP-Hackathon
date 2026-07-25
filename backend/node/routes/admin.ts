@@ -242,6 +242,56 @@ adminRouter.put('/users/:id/role', requireAdmin, async (req: RoleAwareRequest, r
 });
 
 /**
+ * DELETE /api/admin/users/:id
+ * Delete a user account and associated profiles/roles (Admin only).
+ */
+adminRouter.delete('/users/:id', requireAdmin, async (req: RoleAwareRequest, res: Response) => {
+  try {
+    const adminUser = req.user!;
+    const { id } = req.params;
+
+    // Validate UUID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!id || !uuidRegex.test(id)) {
+      return res.status(400).json({ error: 'Invalid or malformed user ID' });
+    }
+
+    if (id === adminUser.id) {
+      return res.status(400).json({ error: 'You cannot delete your own admin account.' });
+    }
+
+    const targetUser = await getRow<{ id: string; email: string }>('SELECT id, email FROM users WHERE id = ?', [id]);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'Target user account not found.' });
+    }
+
+    // Delete associated data
+    await runQuery('DELETE FROM officer_profiles WHERE user_id = ?', [id]);
+    await runQuery('DELETE FROM user_roles WHERE user_id = ?', [id]);
+    await runQuery('DELETE FROM sessions WHERE user_id = ?', [id]);
+    await runQuery('DELETE FROM users WHERE id = ?', [id]);
+
+    // Log cryptographic audit log
+    await logRbacAuditTrail(
+      adminUser.id,
+      'DELETE_USER',
+      id,
+      targetUser.email,
+      'N/A'
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'User deleted successfully.'
+    });
+
+  } catch (error: any) {
+    console.error('Error deleting user:', error);
+    return res.status(500).json({ error: 'Internal server error deleting user' });
+  }
+});
+
+/**
  * GET /api/admin/rbac-audit-logs
  * Fetch immutable cryptographic audit trail for RBAC actions (Admin only).
  */

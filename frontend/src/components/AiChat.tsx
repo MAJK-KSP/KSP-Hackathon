@@ -50,7 +50,34 @@ const CopySqlButton: React.FC<CopySqlButtonProps> = ({ text, label }) => {
 };
 
 export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
-  const { locale, t } = useLanguage();
+  const { locale, t, translateText } = useLanguage();
+  const [targetTransLang, setTargetTransLang] = useState<string>('kn');
+  const [translatedMessages, setTranslatedMessages] = useState<Record<string, string>>({});
+  const [translatingMsgId, setTranslatingMsgId] = useState<string | null>(null);
+
+  const handleZiaTranslate = async (msgId: string, content: string, targetLang: string = 'kn') => {
+    if (translatedMessages[msgId]) {
+      // Toggle back to original text if already translated
+      const updated = { ...translatedMessages };
+      delete updated[msgId];
+      setTranslatedMessages(updated);
+      return;
+    }
+
+    setTranslatingMsgId(msgId);
+    try {
+      const translated = await translateText(content, targetLang);
+      if (translated && translated !== content) {
+        setTranslatedMessages(prev => ({ ...prev, [msgId]: translated }));
+      } else {
+        console.warn('Translation returned same text — API may have failed silently');
+      }
+    } catch (err) {
+      console.error('Zoho Zia Translate failed:', err);
+    } finally {
+      setTranslatingMsgId(null);
+    }
+  };
   const [isOpen, setIsOpen] = useState(isFullPage);
   const [showHistory, setShowHistory] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -338,17 +365,18 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
     setKannadaLoadingId(msgId);
 
     try {
-      // Use MyMemory free translation API (no API key required)
-      const textChunk = cleanText.substring(0, 500); // API limit
-      const res = await fetch(
-        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(textChunk)}&langpair=en|kn`,
-        { signal: AbortSignal.timeout(8000) }
-      );
+      // Use Zoho Catalyst QuickML Zia Translate API via /api/ai/translate
+      const res = await fetch('/api/ai/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: cleanText.substring(0, 800), target_language: 'kn' })
+      });
 
-      if (!res.ok) throw new Error('Translation API failed');
-
-      const data = await res.json();
-      const kannadaText = data?.responseData?.translatedText || textChunk;
+      let kannadaText = cleanText;
+      if (res.ok) {
+        const data = await res.json();
+        kannadaText = data.translated_text || cleanText;
+      }
 
       if (!('speechSynthesis' in window)) {
         setKannadaLoadingId(null);
@@ -1233,12 +1261,17 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
                           </div>
                         ) : (
                           <>
-                            <div className="ai-msg-content">{parseMarkdown(msg.content)}</div>
+                            {Boolean(translatedMessages[msg.id]) && (
+                              <div style={{ fontSize: '0.72rem', background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', padding: '3px 8px', borderRadius: '4px', marginBottom: '6px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                ✨ Zoho Zia Translated (NLP Model)
+                              </div>
+                            )}
+                            <div className="ai-msg-content">{parseMarkdown(translatedMessages[msg.id] || msg.content)}</div>
                             {msg.role === 'assistant' && !msg.is_generating && (
-                              <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                                 <button
                                   className={`ai-tts-listen-btn ${playingMessageId === msg.id ? 'playing' : ''}`}
-                                  onClick={() => synthesizeAndPlay(msg.id, msg.content)}
+                                  onClick={() => synthesizeAndPlay(msg.id, translatedMessages[msg.id] || msg.content)}
                                 >
                                   {ttsLoadingMessageId === msg.id ? (
                                     <>⌛ {t('Synthesizing Zia TTS...')}</>
@@ -1249,15 +1282,16 @@ export const AiChat: React.FC<AiChatProps> = ({ isFullPage = false }) => {
                                   )}
                                 </button>
                                 <button
-                                  className={`ai-tts-listen-btn kannada-btn ${kannadaPlayingId === msg.id ? 'playing' : ''}`}
-                                  onClick={() => translateAndPlayKannada(msg.id, msg.content)}
+                                  className={`ai-tts-listen-btn kannada-btn ${translatingMsgId === msg.id ? 'playing' : ''}`}
+                                  onClick={() => handleZiaTranslate(msg.id, msg.content, targetTransLang)}
+                                  style={{ background: translatedMessages[msg.id] ? '#15803d' : '#047857', color: '#ffffff' }}
                                 >
-                                  {kannadaLoadingId === msg.id ? (
-                                    <>⌛ {t('Translating to ಕನ್ನಡ...')}</>
-                                  ) : kannadaPlayingId === msg.id ? (
-                                    <>⏹️ {t('Stop ಕನ್ನಡ')}</>
+                                  {translatingMsgId === msg.id ? (
+                                    <>⌛ {t('Translating via Zia...')}</>
+                                  ) : translatedMessages[msg.id] ? (
+                                    <>↩️ {t('Show Original')}</>
                                   ) : (
-                                    <>🗣️ {t('ಕನ್ನಡದಲ್ಲಿ ಕೇಳಿ')}</>
+                                    <>🌐 {t('Translate (Zoho Zia)')}</>
                                   )}
                                 </button>
                               </div>

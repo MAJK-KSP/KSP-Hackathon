@@ -230,6 +230,108 @@ const dictionary: Record<string, string> = {
   "Help": "ಸಹಾಯ",
   "Copyright © 2026 Karnataka State Police. All Rights Reserved.": "ಕೃತಿಸ್ವಾಮ್ಯ © 2026 ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್. ಎಲ್ಲಾ ಹಕ್ಕುಗಳನ್ನು ಕಾಯ್ದಿರಿಸಲಾಗಿದೆ.",
   "Designed & Developed by KSP IT Cell / National Informatics Centre (NIC).": "ವಿನ್ಯಾಸ ಮತ್ತು ಅಭಿವೃದ್ಧಿಪಡಿಸಿದವರು KSP ಐಟಿ ಸೆಲ್ / ರಾಷ್ಟ್ರೀಯ ಮಾಹಿತಿ ಕೇಂದ್ರ (NIC)."
+,
+  // Auto-translated missing UI strings
+  "Command Center": "ಆದೇಶ ಕೇಂದ್ರ",
+  "Duty Roster & Tasks": "ಕರ್ತವ್ಯ ಪಟ್ಟಿ ಮತ್ತು ಕಾರ್ಯಗಳು",
+  "Terminal Diagnostics": "ಟರ್ಮಿನಲ್ ಡಯಾಗ್ನೋಸ್ಟಿಕ್ಸ್",
+  "AI Datasets": "ಎಐ ಡೇಟಾಸೆಟ್‌ಗಳು",
+  "Officer Badge": "ಅಧಿಕಾರಿ ಬ್ಯಾಡ್ಜ್",
+  "Clearance": "ಸ್ಪಷ್ಟೀಕರಣ",
+  "LIVE DISPATCH CONNECTED": "ಲೈವ್ ಡಿಸ್ಪಾಚ್ ಸಂಪರ್ಕಿತ",
+  "Refresh Briefings": "ಹೊಸತನವನ್ನು ಪುನಃಪಡೆಯಿರಿ",
+  "Station Daily Briefing": "ಸ್ಟೇಷನ್ ದೈನಂದಿನ ಸಂಕ್ಷಿಪ್ತ ವಿವರಣೆ",
+  "Bulletins": "ಪ್ರಕಟಣೆಗಳು",
+  "Fetching station briefing...": "ಸ್ಟೇಷನ್ ಬ್ರೀಫಿಂಗ್ ಪಡೆಯಲಾಗುತ್ತಿದೆ...",
+  "Station Operational — All Clear": "ಸ್ಟೇಷನ್ ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತಿದೆ — ಎಲ್ಲಾ ಸ್ಪಷ್ಟ",
+  "No urgent bulletins or dispatches assigned for your station today. Standard watch applies.": "ನಿಮ್ಮ ಸ್ಟೇಷನ್‌ಗೆ ಇಂದು ಯಾವುದೇ ತುರ್ತು ಬುಲೆಟಿನ್‌ಗಳು ಅಥವಾ ಡಿಸ್ಪ್ಯಾಚ್‌ಗಳು ನಿಗದಿಪಡಿಸಲಾಗಿಲ್ಲ. ಸಾಮಾನ್ಯ ವಾಚ್ ಅನ್ವಯಿಸುತ್ತದೆ.",
+  "View Full Roster & Past Logs": "ಸಂಪೂರ್ಣ ಪಟ್ಟಿ ಮತ್ತು ಹಿಂದಿನ ದಾಖಲೆಗಳನ್ನು ವೀಕ್ಷಿಸಿ",
+  "Acknowledged": "ಒಪ್ಪಿಕೊಂಡಿದೆ",
+  "Mark Acknowledged": "ಮಾರ್ಕ್ ಒಪ್ಪಿಕೊಂಡಿದೆ",
+  "View All Station Briefings & Roster": "ಎಲ್ಲಾ ಸ್ಟೇಷನ್ ಬ್ರೀಫಿಂಗ್‌ಗಳು ಮತ್ತು ರೋಸ್ಟರ್ ಅನ್ನು ವೀಕ್ಷಿಸಿ",
+  "AI Intelligence Assistant": "ಎಐ ಬುದ್ಧಿವಂತ ಸಹಾಯಕ",
+  "24/7 Investigative Copilot": "೨೪/೭ ತನಿಖಾ ಸಹಾಯಕ",
+  "Ask the KSP AI Copilot to analyze FIR files, look up penal codes, summarize crime trends, or generate shift intelligence reports.": "KSP AI Copilot ಅನ್ನು ಕೇಳಿ FIR ಫೈಲ್‌ಗಳನ್ನು ವಿಶ್ಲೇಷಿಸಲು, ಶಿಕ್ಷಾ ನಿಯಮಗಳನ್ನು ಹುಡುಕಲು, ಅಪರಾಧ ಪ್ರವೃತ್ತಿಗಳನ್ನು ಸಂಕ್ಷಿಪ್ತಗೊಳಿಸಲು ಅಥವಾ ಪಾಲಿಶ್ ಇಂಟೆಲಿಜೆನ್ಸ್ ವರದಿಗಳನ್ನು ರಚಿಸಲು.",
+  "Quick Assistant Actions": "ತ್ವರಿತ ಸಹಾಯಕ ಕ್ರಿಯೆಗಳು",
+  "Search IPC / Legal Provisions": "ಐಪಿಸಿ / ಕಾನೂನು ಧಾರಾಳಗಳನ್ನು ಹುಡುಕಿ",
+  "Analyze Crime Telemetry": "ಅಪರಾಧ ಟೆಲಿಮೆಟ್ರಿಯನ್ನು ವಿಶ್ಲೇಷಿಸಿ",
+  "Draft Shift Summary": "ಡ್ರಾಫ್ಟ್ ಶಿಫ್ಟ್ ಸಾರಾಂಶ",
+  "Query FIR Records": "ಎಫ್ಐಆರ್ ದಾಖಲೆಗಳನ್ನು ಪರಿಶೀಲಿಸಿ",
+  "Launch AI Assistant Copilot": "AI ಅಸಿಸ್ಟೆಂಟ್ ಕೋಪೈಲಾಟ್ ಲಾಂಚ್ ಮಾಡಿ",
+  "Secured with end-to-end audit logging": "ಅಂತ್ಯ-ದಿಂದ-ಅಂತ್ಯ ಪರಿಶೀಲನಾ ಲಾಗ್‌ಗಳೊಂದಿಗೆ ಸುರಕ್ಷಿತಗೊಂಡಿದೆ",
+  "Daily Security Checklist": "ದೈನಂದಿನ ಭದ್ರತಾ ಪರಿಶೀಲನೆ ಪಟ್ಟಿ",
+  "Low": "ಕಡಿಮೆ",
+  "Normal": "ಸಾಮಾನ್ಯ",
+  "High": "ಹೆಚ್ಚು",
+  "Urgent": "ತುರ್ತು",
+  "System Diagnostics & Connection Status": "ಸಿಸ್ಟಮ್ ಡಯಾಗ್ನೋಸ್ಟಿಕ್ಸ್ ಮತ್ತು ಸಂಪರ್ಕ ಸ್ಥಿತಿ",
+  "Run Diagnostics": "ಡಯಾಗ್ನೋಸ್ಟಿಕ್ಸ್ ನಡೆಸಿ",
+  "Register Operational Dataset": "ರಿಜಿಸ್ಟರ್ ಆಪರೇಷನಲ್ ಡೇಟಾಸೆಟ್",
+  "Table Name": "ಪಟ್ಟಿ ಹೆಸರು",
+  "Dataset Description": "ಡೇಟಾಸೆಟ್ ವಿವರಣೆ",
+  "Live Database Search Autocomplete": "ಲೈವ್ ಡೇಟಾಬೇಸ್ ಹುಡುಕಾಟ ಸ್ವಯಂಪೂರ್ಣ",
+  "Type to search suspect name, FIR number, or crime category...": "ಸಂಶಯಾಸ್ಪದ ವ್ಯಕ್ತಿಯ ಹೆಸರು, ಎಫ್‌ಐಆರ್ ಸಂಖ್ಯೆ ಅಥವಾ ಅಪರಾಧ ವಿಭಾಗವನ್ನು ಹುಡುಕಲು ಟೈಪ್ ಮಾಡಿ...",
+  "Karnataka State Police FIR Generator": "ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್ ಎಫ್‌ಐಆರ್ ಜನರೇಟರ್",
+  "Form Editor": "ಫಾರ್ಮ್ ಸಂಪಾದಕ",
+  "2-Page Document Preview": "2-ಪುಟಗಳ ದಾಖಲೆಯ ಪೂರ್ವವೀಕ್ಷಣೆ",
+  "Save FIR Record": "ಎಫ್‌ಐಆರ್ ದಾಖಲೆಯನ್ನು ಉಳಿಸಿ",
+  "Print / Download 2-Page PDF": "ಮುದ್ರಿಸಿ / 2-ಪುಟಗಳ PDF ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
+  "Crime Heat Density": "ಅಪರಾಧದ ಉಷ್ಣತೆಯ ಸಾಂದ್ರತೆ",
+  "Search by FIR ID, landmark, or suspect...": "FIR ID, ಸ್ಥಳೀಯ ಚಿಹ್ನೆ ಅಥವಾ ಆರೋಪಿಯನ್ನು ಹುಡುಕಿ...",
+  "Cluster Location Inspection": "ಕ್ಲಸ್ಟರ್ ಸ್ಥಳ ಪರಿಶೀಲನೆ",
+  "Cases": "ಕೇಸುಗಳು",
+  "Cluster Coordinates": "ಕ್ಲಸ್ಟರ್ ನಿರ್ದೇಶಾಂಕಗಳು",
+  "Dominant Station": "ಪ್ರಬಲ ಸ್ಟೇಷನ್",
+  "Cases in this Cluster": "ಈ ಕ್ಲಸ್ಟರ್‌ನಲ್ಲಿರುವ ಪ್ರಕರಣಗಳು",
+  "Inspect Dossier": "ಡಾಸಿಯರ್ ಪರಿಶೀಲಿಸಿ",
+  "Zoom into Area": "ಕ್ಷೇತ್ರವನ್ನು ಜೂಮ್ ಮಾಡಿ",
+  "Location & FIR Case Dossier": "ಸ್ಥಳ ಮತ್ತು ಎಫ್‌ಐಆರ್ ಪ್ರಕರಣ ಡಾಸಿಯರ್",
+  "Closed / Solved": "ಮುಚ್ಚಿದೆ / ಪರಿಹರಿಸಲಾಗಿದೆ",
+  "Active Incident": "ಸಕ್ರಿಯ ಘಟನೆ",
+  "FIR / Case Number": "ಎಫ್‌ಐಆರ್ / ಪ್ರಕರಣ ಸಂಖ್ಯೆ",
+  "Crime Category": "ಅಪರಾಧ ವರ್ಗ",
+  "Reported Date": "ವರದಿ ಮಾಡಿದ ದಿನಾಂಕ",
+  "Coordinates": "ನಿರ್ದೇಶಾಂಕಗಳು",
+  "Case Brief Facts & Particulars": "ಕೇಸ್ ಬ್ರೀಫ್ ತಥ್ಯಗಳು ಮತ್ತು ನಿರ್ದಿಷ್ಟ ವಿವರಗಳು",
+  "Open in Google Maps": "ಗೂಗಲ್ ಮ್ಯಾಪ್‌ನಲ್ಲಿ ತೆರೆಯಿರಿ",
+  "Ask AI Assistant about this Case": "ಈ ಪ್ರಕರಣದ ಬಗ್ಗೆ AI ಸಹಾಯಕನನ್ನು ಕೇಳಿ",
+  "Tactical Criminal Network & Relationship Analysis": "ತಾಕ್ಟಿಕಲ್ ಕ್ರೈಮ್ ನೆಟ್‌ವರ್ಕ್ ಮತ್ತು ಸಂಬಂಧ ವಿಶ್ಲೇಷಣೆ",
+  "Add Entity": "ಘಟಕವನ್ನು ಸೇರಿಸಿ",
+  "Search suspect, witness, vehicle, or FIR number...": "ಸಂಶಿತ, ಸಾಕ್ಷಿ, ವಾಹನ ಅಥವಾ ಎಫ್‌ಐಆರ್ ಸಂಖ್ಯೆ ಹುಡುಕಿ...",
+  "Search criminal gang suspect name or alias...": "ಅಪರಾಧ ಗ್ಯಾಂಗ್ ಸಂತ್ರಸ್ಥನ ಹೆಸರು ಅಥವಾ ಪರ್ಯಾಯ ಹೆಸರು ಹುಡುಕಿ...",
+  "Role-Based Access Control & User Administration": "ಪಾತ್ರ-ಆಧಾರಿತ ಪ್ರವೇಶ ನಿಯಂತ್ರಣ ಮತ್ತು ಬಳಕೆದಾರ ನಿರ್ವಹಣೆ",
+  "Manage investigator, analyst, supervisor, and policymaker access credentials with cryptographic audit logging.": "ಕ್ರಿಪ್ಟೋಗ್ರಾಫಿಕ್ ಆಡಿಟ್ ಲಾಗ್‌ನೊಂದಿಗೆ ತನಿಖಾಧಿಕಾರಿ, ವಿಶ್ಲೇಷಕ, ಮೇಲ್ವಿಚಾರಕ ಮತ್ತು ನೀತಿ ರಚನೆಯ ಅಧಿಕಾರಿಯ ಪ್ರವೇಶ ಪ್ರಮಾಣಪತ್ರಗಳನ್ನು ನಿರ್ವಹಿಸಿ.",
+  "Create New User": "ಹೊಸ ಬಳಕೆದಾರರನ್ನು ರಚಿಸಿ",
+  "User Directory & Roles": "ಬಳಕೆದಾರರ ಡೈರೆಕ್ಟರಿ ಮತ್ತು ಪಾತ್ರಗಳು",
+  "Cryptographic Audit Trail": "ಕ್ರಿಪ್ಟೋಗ್ರಾಫಿಕ್ ಆಡಿಟ್ ಟ್ರೇಲ್",
+  "Loading user credentials...": "ಬಳಕೆದಾರರ ಪ್ರಮಾಣೀಕರಣಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ...",
+  "User Email": "ಬಳಕೆದಾರರ ಇಮೇಲ್",
+  "Assigned RBAC Role": "ನಿಯೋಜಿತ RBAC ಪಾತ್ರ",
+  "Station / Badge": "ನಿಲ್ದಾಣ / ಬ್ಯಾಡ್ಜ್",
+  "MFA Status": "ಎಂಎಫ್‌ಎ ಸ್ಥಿತಿ",
+  "Created Date": "ಸೃಷ್ಟಿಸಿದ ದಿನಾಂಕ",
+  "Change Role": "ಪಾತ್ರ ಬದಲಾಯಿಸಿ",
+  "Actions": "ಕ್ರಿಯೆಗಳು",
+  "Enabled": "ಸಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ",
+  "Disabled": "ಅಸಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ",
+  "Delete User": "ಬಳಕೆದಾರರನ್ನು ಅಳಿಸಿ",
+  "Action": "ಕ್ರಿಯೆ",
+  "Admin": "ಆಡ್ಮಿನ್",
+  "Target User": "ಲಕ್ಷ್ಯ ಬಳಕೆದಾರ",
+  "Role": "ಪಾತ್ರ",
+  "Timestamp": "ಸಮಯ ಮುದ್ರೆ",
+  "No RBAC audit logs recorded yet.": "ಇನ್ನೂ ಯಾವುದೇ RBAC ಆಡಿಟ್ ಲಾಗ್‌ಗಳು ದಾಖಲಾಗಿಲ್ಲ.",
+  "Create User & Assign RBAC Role": "ಬಳಕೆದಾರರನ್ನು ರಚಿಸಿ ಮತ್ತು RBAC ಪಾತ್ರವನ್ನು ನಿಯೋಜಿಸಿ",
+  "User Email Address": "ಬಳಕೆದಾರರ ಇಮೇಲ್ ವಿಳಾಸ",
+  "Password": "ಪಾಸ್‌ವರ್ಡ್",
+  "Assign RBAC Role": "RBAC ಪಾತ್ರವನ್ನು ನಿಯೋಜಿಸಿ",
+  "Station / Post": "ನಿಲ್ದಾಣ / ಕೇಂದ್ರ",
+  "Create Account & Assign Role": "ಖಾತೆ ರಚಿಸಿ ಮತ್ತು ಪಾತ್ರವನ್ನು ನಿಯೋಜಿಸಿ",
+  "COMMAND & OPERATIONS": "ಆದೇಶ ಮತ್ತು ಕಾರ್ಯಾಚರಣೆಗಳು",
+  "FIR Generator": "ಎಫ್‌ಐಆರ್ ಜನರೇಟರ್",
+  "INTELLIGENCE SUITE": "ಬುದ್ಧಿವಂತಿಕೆಯ ಸೂಟ್",
+  "SYSTEM & SECURITY": "ಸಿಸ್ಟಮ್ ಮತ್ತು ಸುರಕ್ಷತೆ",
+
 };
 
 interface LanguageContextType {
@@ -251,6 +353,26 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [locale, setLocale] = useState<'en' | 'kn'>(() => {
     return (localStorage.getItem('pref-lang') as 'en' | 'kn') || 'en';
   });
+
+  // Global fetch interceptor to attach Accept-Language header for backend translation
+  useEffect(() => {
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+      let [resource, config] = args;
+      if (typeof resource === 'string' && resource.startsWith('/api')) {
+        config = config || {};
+        config.headers = {
+          ...config.headers,
+          'Accept-Language': locale,
+        };
+      }
+      return originalFetch(resource, config);
+    };
+
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, [locale]);
 
   useEffect(() => {
     localStorage.setItem('pref-lang', locale);

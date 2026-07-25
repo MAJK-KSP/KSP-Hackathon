@@ -25,6 +25,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useLanguage } from '../LanguageContext';
+import { DbAutocompleteInput } from './DbAutocompleteInput';
 
 // Entity Color Palette & Configuration (Clean White & Navy Theme)
 const ENTITY_CONFIG: Record<string, { bg: string; border: string; text: string; labelColor: string; icon: string }> = {
@@ -60,7 +61,7 @@ const CustomEntityNode: React.FC<NodeProps> = ({ data, selected }) => {
       style={{
         background: isCentral ? '#0b1e36' : cfg.bg,
         border: `2px solid ${selected ? '#c5a059' : isCentral ? '#c5a059' : cfg.border}`,
-        borderRadius: isCentral ? '16px' : '12px',
+        borderRadius: isCentral ? '12px' : '8px',
         padding: isCentral ? '14px 18px' : '12px 14px',
         width: isCentral ? '280px' : '250px',
         boxShadow: selected
@@ -139,27 +140,30 @@ const CustomNetworkEdge: React.FC<EdgeProps> = (props) => {
     borderRadius: 16,
   });
 
-  const isCoAccused = label === 'CO_ACCUSED' || label === 'CO_ACCUSED_GANG' || label === 'SHARED_ACCOMPLICE';
-  const isSimilarArea = label === 'SAME_MO_&_AREA';
+  const isCoAccused = label === 'CO_ACCUSED' || label === 'CO_ACCUSED_GANG';
+  const isSharedAccomplice = label === 'SHARED_ACCOMPLICE';
+  const isSharedMoSpot = label === 'SHARED_MO_SPOT' || label === 'SAME_MO_&_AREA';
   const isVictim = label === 'VICTIM_OF' || label === 'FILED_COMPLAINT';
   const isWitness = label === 'WITNESSED';
-  const isVehicle = label === 'USED_VEHICLE' || label === 'GETAWAY_VEHICLE';
+  const isVehicle = label === 'USED_VEHICLE' || label === 'GETAWAY_VEHICLE' || label === 'SHARED_ASSET';
   const isWeapon = label === 'WEAPON_USED' || label === 'EVIDENCE_IN';
 
   const strokeColor = selected
     ? '#ffe082'
     : isCoAccused
-    ? '#ef4444'
-    : isSimilarArea
-    ? '#a855f7'
+    ? '#dc2626'
+    : isSharedAccomplice
+    ? '#ea580c'
+    : isSharedMoSpot
+    ? '#7c3aed'
     : isVictim
-    ? '#3b82f6'
+    ? '#2563eb'
     : isWitness
-    ? '#c084fc'
+    ? '#9333ea'
     : isVehicle
-    ? '#38bdf8'
+    ? '#0284c7'
     : isWeapon
-    ? '#f97316'
+    ? '#d97706'
     : '#475569';
 
   return (
@@ -169,8 +173,8 @@ const CustomNetworkEdge: React.FC<EdgeProps> = (props) => {
         d={edgePath}
         fill="none"
         stroke={strokeColor}
-        strokeWidth={selected ? 3.5 : isCoAccused || isSimilarArea ? 2.5 : 2}
-        strokeDasharray={isSimilarArea ? '6 4' : isCoAccused ? '4 2' : 'none'}
+        strokeWidth={selected ? 3.5 : isCoAccused || isSharedAccomplice ? 2.5 : 2}
+        strokeDasharray={isSharedMoSpot ? '6 4' : isCoAccused ? 'none' : '4 2'}
       />
       {label && (
         <EdgeLabelRenderer>
@@ -216,7 +220,9 @@ const NetworkGraphContent: React.FC = () => {
 
   // Mode 1 Case Selection
   const [availableCases, setAvailableCases] = useState<any[]>([]);
-  const [selectedCaseId, setSelectedCaseId] = useState<string>('');
+  const [selectedCaseId, setSelectedCaseId] = useState<string>('NONE');
+
+
 
   // Mode 2 Cluster Filters
   const [moFilter, setMoFilter] = useState<string>('ALL');
@@ -241,9 +247,6 @@ const NetworkGraphContent: React.FC = () => {
         const data = await res.json();
         if (data.cases) {
           setAvailableCases(data.cases);
-          if (data.cases.length > 0 && !selectedCaseId) {
-            setSelectedCaseId(data.cases[0].id);
-          }
         }
       }
     } catch (err) {
@@ -262,8 +265,17 @@ const NetworkGraphContent: React.FC = () => {
       params.append('mode', networkMode);
 
       if (networkMode === 'case') {
-        if (selectedCaseId) params.append('case_id', selectedCaseId);
+        if (selectedCaseId && selectedCaseId !== 'NONE') params.append('case_id', selectedCaseId);
         if (searchQuery) params.append('query', searchQuery);
+
+        // If 'NONE' is selected and user hasn't typed a search query yet, render empty canvas
+        if ((!selectedCaseId || selectedCaseId === 'NONE') && !searchQuery.trim()) {
+          setNodes([]);
+          setEdges([]);
+          setLoading(false);
+          setTelemetry({ total_nodes: 0, total_edges: 0 });
+          return;
+        }
       } else {
         if (searchQuery) params.append('query', searchQuery);
         if (moFilter !== 'ALL') params.append('mo', moFilter);
@@ -458,172 +470,73 @@ const NetworkGraphContent: React.FC = () => {
       <div style={{
         background: '#ffffff',
         border: '1px solid #e2e8f0',
-        borderRadius: '14px',
-        padding: '1.25rem 1.5rem',
+        borderRadius: '12px',
+        padding: '1rem 1.25rem',
         marginBottom: '1rem',
-        boxShadow: '0 4px 14px rgba(11, 30, 54, 0.05)'
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
-              <span style={{ background: '#fdfaf2', color: '#a4823f', border: '1px solid rgba(197, 160, 89, 0.4)', padding: '0.2rem 0.65rem', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 800 }}>
-                KSP INTELLIGENCE COMMAND
-              </span>
-              <span style={{
-                background: networkMode === 'case' ? '#ecfdf5' : '#faf5ff',
-                color: networkMode === 'case' ? '#047857' : '#6b21a8',
-                border: `1px solid ${networkMode === 'case' ? '#a7f3d0' : '#e9d5ff'}`,
-                padding: '0.2rem 0.6rem',
-                borderRadius: '20px',
-                fontSize: '0.72rem',
-                fontWeight: 800
-              }}>
-                {networkMode === 'case' ? 'MODE 1: CASE-SPECIFIC DEEP DIVE' : 'MODE 2: ORGANIZED CRIME PATTERN FINDER'}
-              </span>
-            </div>
-            <h2 style={{ margin: 0, color: '#0b1e36', fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.3px', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <span>{networkMode === 'case' ? '📂' : '🕸️'}</span>
+            <h2 style={{ margin: 0, color: '#0b1e36', fontSize: '1.35rem', fontWeight: 800, letterSpacing: '-0.3px' }}>
               {t("Tactical Criminal Network & Relationship Analysis")}
             </h2>
           </div>
 
-          <button
-            onClick={() => setShowAddDrawer(true)}
-            style={{
-              background: 'linear-gradient(135deg, #0b1e36 0%, #152c4b 100%)',
-              color: '#c5a059',
-              border: '1px solid #c5a059',
-              padding: '0.65rem 1.2rem',
-              borderRadius: '8px',
-              fontWeight: 900,
-              fontSize: '0.88rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              boxShadow: '0 4px 14px rgba(11, 30, 54, 0.15)'
-            }}
-          >
-            <span>➕</span> {t("Add New Entity to Graph")}
-          </button>
-        </div>
+          {/* Mode Switcher Tabs + Add Entity Button */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+              <button
+                onClick={() => setNetworkMode('case')}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: networkMode === 'case' ? '#0b1e36' : 'transparent',
+                  color: networkMode === 'case' ? '#ffffff' : '#475569',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                📂 Mode 1: Case Deep Dive
+              </button>
+              <button
+                onClick={() => setNetworkMode('gang')}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: networkMode === 'gang' ? '#0b1e36' : 'transparent',
+                  color: networkMode === 'gang' ? '#ffffff' : '#475569',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                🕸️ Mode 2: Organized Crime Network
+              </button>
+            </div>
 
-        {/* MODE TOGGLE SWITCHER */}
-        <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => setNetworkMode('case')}
-            style={{
-              flex: 1,
-              minWidth: '260px',
-              padding: '0.8rem 1.1rem',
-              borderRadius: '12px',
-              border: networkMode === 'case' ? '2px solid #0b1e36' : '1px solid #e2e8f0',
-              background: networkMode === 'case' ? '#f0f7ff' : '#ffffff',
-              color: networkMode === 'case' ? '#0b1e36' : '#64748b',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.85rem',
-              boxShadow: networkMode === 'case' ? '0 4px 14px rgba(11, 30, 54, 0.08)' : 'none',
-              transition: 'all 0.25s ease',
-              textAlign: 'left'
-            }}
-          >
-            <div style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              background: networkMode === 'case' ? '#0b1e36' : '#f1f5f9',
-              color: networkMode === 'case' ? '#ffffff' : '#64748b',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '1.3rem',
-              fontWeight: 900
-            }}>
-              📂
-            </div>
-            <div>
-              <div style={{ fontSize: '0.95rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#0b1e36' }}>
-                Mode 1: Case-Specific Network (Deep Dive)
-              </div>
-              <div style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 600, marginTop: '2px' }}>
-                Centralized FIR diagram with Accused, Victims, Witnesses &amp; Vehicles
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setNetworkMode('gang')}
-            style={{
-              flex: 1,
-              minWidth: '260px',
-              padding: '0.8rem 1.1rem',
-              borderRadius: '12px',
-              border: networkMode === 'gang' ? '2px solid #6b21a8' : '1px solid #e2e8f0',
-              background: networkMode === 'gang' ? '#faf5ff' : '#ffffff',
-              color: networkMode === 'gang' ? '#581c87' : '#64748b',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.85rem',
-              boxShadow: networkMode === 'gang' ? '0 4px 14px rgba(107, 33, 168, 0.12)' : 'none',
-              transition: 'all 0.25s ease',
-              textAlign: 'left'
-            }}
-          >
-            <div style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              background: networkMode === 'gang' ? '#6b21a8' : '#f1f5f9',
-              color: networkMode === 'gang' ? '#ffffff' : '#64748b',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '1.3rem',
-              fontWeight: 900
-            }}>
-              🕸️
-            </div>
-            <div>
-              <div style={{ fontSize: '0.95rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#0b1e36' }}>
-                Mode 2: Organized Crime Network (Pattern Finder)
-              </div>
-              <div style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 600, marginTop: '2px' }}>
-                Clusters criminals by Similar MO, Area Proximity &amp; Shared Accomplices
-              </div>
-            </div>
-          </button>
-        </div>
-
-        {/* 5 STAT METRIC PILLS */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.85rem', marginTop: '1rem' }}>
-          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.65rem 0.85rem' }}>
-            <div style={{ fontSize: '0.7rem', color: '#a4823f', fontWeight: 800, textTransform: 'uppercase' }}>Network Nodes</div>
-            <div style={{ fontSize: '1.3rem', color: '#0b1e36', fontWeight: 900 }}>{nodes.length}</div>
-          </div>
-          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.65rem 0.85rem' }}>
-            <div style={{ fontSize: '0.7rem', color: '#0284c7', fontWeight: 800, textTransform: 'uppercase' }}>Active Relational Edges</div>
-            <div style={{ fontSize: '1.3rem', color: '#0b1e36', fontWeight: 900 }}>{edges.length}</div>
-          </div>
-          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.65rem 0.85rem' }}>
-            <div style={{ fontSize: '0.7rem', color: '#dc2626', fontWeight: 800, textTransform: 'uppercase' }}>High Risk Suspects</div>
-            <div style={{ fontSize: '1.3rem', color: '#dc2626', fontWeight: 900 }}>{totalHighRisk}</div>
-          </div>
-          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.65rem 0.85rem' }}>
-            <div style={{ fontSize: '0.7rem', color: '#7c3aed', fontWeight: 800, textTransform: 'uppercase' }}>
-              {networkMode === 'gang' ? 'Syndicate Clusters' : 'Connected Entities'}
-            </div>
-            <div style={{ fontSize: '1.3rem', color: '#6b21a8', fontWeight: 900 }}>
-              {telemetry?.clusters_count || telemetry?.accused_count || nodes.length}
-            </div>
-          </div>
-          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.65rem 0.85rem' }}>
-            <div style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 800, textTransform: 'uppercase' }}>Active Mode</div>
-            <div style={{ fontSize: '1rem', color: '#0b1e36', fontWeight: 900 }}>
-              {networkMode === 'case' ? 'Deep Dive Topology' : 'Pattern Finder Cluster'}
-            </div>
+            <button
+              onClick={() => setShowAddDrawer(true)}
+              style={{
+                background: '#0b1e36',
+                color: '#ffffff',
+                border: 'none',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem'
+              }}
+            >
+              <span>+</span> {t("Add Entity")}
+            </button>
           </div>
         </div>
 
@@ -631,19 +544,16 @@ const NetworkGraphContent: React.FC = () => {
         <div style={{
           background: '#ffffff',
           border: '1px solid #e2e8f0',
-          borderRadius: '10px',
-          padding: '1rem',
-          marginTop: '1.25rem',
+          borderRadius: '8px',
+          padding: '0.85rem 1rem',
+          marginTop: '0.85rem',
           display: 'flex',
           flexDirection: 'column',
-          gap: '1rem'
+          gap: '0.75rem'
         }}>
           {networkMode === 'case' ? (
             /* MODE 1 CASE SELECTOR ROW */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <label style={{ color: '#0b1e36', fontWeight: 900, fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                🔍 Select Specific FIR / Case for Deep Dive Topology:
-              </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
               <select
                 value={selectedCaseId}
                 onChange={(e) => setSelectedCaseId(e.target.value)}
@@ -659,9 +569,12 @@ const NetworkGraphContent: React.FC = () => {
                   fontWeight: 800
                 }}
               >
+                <option value="NONE">
+                  🚫 None (Search Only Mode — Show Only Searched Entities & Criminals)
+                </option>
                 {availableCases.map((c) => (
                   <option key={c.id} value={c.id}>
-                    FIR #{c.case_number} - {c.station_name} ({c.category}) — {c.title}
+                    FIR #{c.case_number} - {c.station_name || c.police_station} ({c.category}) — {c.title}
                   </option>
                 ))}
               </select>
@@ -716,83 +629,59 @@ const NetworkGraphContent: React.FC = () => {
                   }}
                 >
                   <option value="ALL">All Police Station Areas</option>
-                  <option value="koramangala">Koramangala</option>
-                  <option value="indiranagar">Indiranagar</option>
-                  <option value="whitefield">Whitefield</option>
-                  <option value="jayanagar">Jayanagar</option>
-                  <option value="malleshwaram">Malleshwaram</option>
-                  <option value="peenya">Peenya</option>
+                  <option value="doddapete">Doddapete PS</option>
+                  <option value="shivamogga">Shivamogga Station</option>
+                  <option value="shimoga">Shimoga Sub-Division</option>
+                  <option value="bangalore">Bangalore City HQ</option>
                 </select>
               </div>
             </div>
           )}
 
           {/* ROW 2: SEARCH INPUT AND ENTITY CATEGORY FILTER */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 240px', gap: '1rem' }}>
-            <div style={{ position: 'relative' }}>
-              <input
-                type="text"
-                placeholder={networkMode === 'case'
-                  ? t("Search suspect, witness, vehicle, or FIR number...")
-                  : t("Search criminal gang suspect name or alias...")}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+          <div style={{ display: 'grid', gridTemplateColumns: networkMode === 'case' ? '1fr 240px' : '1fr', gap: '1rem' }}>
+            <DbAutocompleteInput
+              placeholder={networkMode === 'case'
+                ? t("Search suspect, witness, vehicle, or FIR number...")
+                : t("Search criminal gang suspect name or alias...")}
+              value={searchQuery}
+              onChange={(val) => setSearchQuery(val)}
+              onSearch={() => fetchGraphData()}
+              onSelectSuggestion={(item) => {
+                if (item.value) {
+                  setSearchQuery(item.value);
+                  setTimeout(() => fetchGraphData(), 50);
+                }
+              }}
+            />
+
+            {/* Category Filter dropdown is displayed in Mode 1 where multiple entity types exist */}
+            {networkMode === 'case' && (
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
                 style={{
                   width: '100%',
                   background: '#f8fafc',
                   border: '1px solid #cbd5e1',
                   color: '#0b1e36',
-                  padding: '0.7rem 2.5rem 0.7rem 1rem',
+                  padding: '0.7rem 0.9rem',
                   borderRadius: '8px',
                   outline: 'none',
-                  fontSize: '0.9rem',
-                  fontWeight: 700
+                  fontWeight: 700,
+                  fontSize: '0.88rem'
                 }}
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    color: '#64748b',
-                    fontSize: '1rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              style={{
-                width: '100%',
-                background: '#f8fafc',
-                border: '1px solid #cbd5e1',
-                color: '#0b1e36',
-                padding: '0.7rem 0.9rem',
-                borderRadius: '8px',
-                outline: 'none',
-                fontWeight: 700,
-                fontSize: '0.88rem'
-              }}
-            >
-              <option value="ALL">All Entity Types</option>
-              <option value="ACCUSED">🔴 Accused &amp; Suspects</option>
-              <option value="VICTIM">🔵 Victims</option>
-              <option value="WITNESS">👤 Witnesses</option>
-              <option value="VEHICLE">🚗 Vehicles</option>
-              <option value="WEAPON">🗡️ Weapons &amp; Evidence</option>
-              <option value="LOCATION">🟢 Locations</option>
-              <option value="INCIDENT">🟡 FIR Incidents</option>
-            </select>
+              >
+                <option value="ALL">All Entity Types</option>
+                <option value="ACCUSED">🔴 Accused &amp; Suspects</option>
+                <option value="VICTIM">🔵 Victims</option>
+                <option value="WITNESS">👤 Witnesses</option>
+                <option value="VEHICLE">🚗 Vehicles</option>
+                <option value="WEAPON">🗡️ Weapons &amp; Evidence</option>
+                <option value="LOCATION">🟢 Locations</option>
+                <option value="INCIDENT">🟡 FIR Incidents</option>
+              </select>
+            )}
           </div>
         </div>
       </div>
@@ -868,61 +757,216 @@ const NetworkGraphContent: React.FC = () => {
               <MiniMap style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px' }} nodeColor="#0b1e36" maskColor="rgba(248, 250, 252, 0.8)" />
             </ReactFlow>
           )}
-        </div>
 
-        {/* RIGHT SIDE ENTITY INSPECTOR PANEL */}
-        {selectedEntity && (
-          <div style={{
-            width: '360px',
-            background: '#ffffff',
-            border: '1px solid #cbd5e1',
-            borderRadius: '14px',
-            padding: '1.25rem',
-            overflowY: 'auto',
-            boxShadow: '0 4px 18px rgba(11, 30, 54, 0.1)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
-              <strong style={{ color: '#0b1e36', fontSize: '1.1rem' }}>Entity Inspector</strong>
-              <button
-                onClick={() => setSelectedEntity(null)}
-                style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '1.2rem', cursor: 'pointer' }}
-              >
-                ✕
-              </button>
-            </div>
+          {/* RIGHT SIDE ENTITY INSPECTOR PANEL */}
+          {selectedEntity && (
+            <div style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              width: '380px',
+              maxHeight: 'calc(100% - 40px)',
+              background: '#ffffff',
+              border: '1.5px solid #0b1e36',
+              borderRadius: '10px',
+              padding: '0',
+              overflowY: 'auto',
+              boxShadow: '0 12px 32px rgba(11, 30, 54, 0.25)',
+              color: '#0b1e36',
+              zIndex: 10
+            }}>
+              {/* HERO POLICE COMMAND HEADER */}
+              <div style={{
+                background: 'linear-gradient(135deg, #070f19 0%, #0b1e36 100%)',
+                padding: '1.25rem 1.4rem',
+                borderTopLeftRadius: '8px',
+                borderTopRightRadius: '8px',
+                borderBottom: '2px solid #c5a059',
+                color: '#ffffff',
+                position: 'relative'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <span style={{
+                    background: selectedEntity.type === 'ACCUSED' ? 'rgba(239, 68, 68, 0.25)' : selectedEntity.type === 'INCIDENT' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(59, 130, 246, 0.25)',
+                    color: selectedEntity.type === 'ACCUSED' ? '#f87171' : selectedEntity.type === 'INCIDENT' ? '#fbbf24' : '#60a5fa',
+                    border: `1px solid ${selectedEntity.type === 'ACCUSED' ? '#ef4444' : selectedEntity.type === 'INCIDENT' ? '#f59e0b' : '#3b82f6'}`,
+                    padding: '0.2rem 0.65rem',
+                    borderRadius: '4px',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.5px'
+                  }}>
+                    {selectedEntity.type === 'ACCUSED' ? '🔴 SUSPECT / ACCUSED' : selectedEntity.type === 'INCIDENT' ? '🟡 CRIME INCIDENT (FIR)' : `🔵 ${selectedEntity.type}`}
+                  </span>
 
-            <div style={{ marginBottom: '1rem' }}>
-              <span style={{ fontSize: '0.75rem', color: '#a4823f', fontWeight: 800, textTransform: 'uppercase' }}>
-                {selectedEntity.type}
-              </span>
-              <h3 style={{ margin: '0.2rem 0', color: '#0b1e36', fontSize: '1.3rem', fontWeight: 900 }}>
-                {selectedEntity.label}
-              </h3>
-              <span style={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'monospace' }}>ID: {selectedEntity.id}</span>
-            </div>
-
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.85rem', borderRadius: '8px', marginBottom: '1rem' }}>
-              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.35rem' }}>Threat Risk Rating</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ flex: 1, height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div style={{ width: `${(selectedEntity.risk_score || 5) * 10}%`, height: '100%', background: (selectedEntity.risk_score || 5) >= 8 ? '#dc2626' : '#d97706' }}></div>
+                  <button
+                    onClick={() => setSelectedEntity(null)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: 'none',
+                      color: '#94a3b8',
+                      width: '26px',
+                      height: '26px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                      fontWeight: 700
+                    }}
+                  >
+                    ✕
+                  </button>
                 </div>
-                <strong style={{ color: (selectedEntity.risk_score || 5) >= 8 ? '#dc2626' : '#d97706', fontSize: '1.1rem' }}>
-                  {selectedEntity.risk_score}/10
-                </strong>
+
+                <h3 style={{ margin: '0.3rem 0 0.1rem 0', color: '#ffffff', fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-0.3px' }}>
+                  {selectedEntity.label}
+                </h3>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontFamily: 'monospace' }}>ENTITY ID: {selectedEntity.id}</span>
+              </div>
+
+              <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {/* THREAT RISK RATING BAR */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.9rem 1rem', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>THREAT ASSESSMENT RATING</span>
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 900,
+                      color: (selectedEntity.risk_score || 5) >= 8 ? '#dc2626' : (selectedEntity.risk_score || 5) >= 6 ? '#d97706' : '#2563eb'
+                    }}>
+                      {(selectedEntity.risk_score || 5) >= 8 ? 'CRITICAL THREAT' : (selectedEntity.risk_score || 5) >= 6 ? 'ELEVATED RISK' : 'MODERATE'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ flex: 1, height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${(selectedEntity.risk_score || 5) * 10}%`,
+                        height: '100%',
+                        background: (selectedEntity.risk_score || 5) >= 8 ? 'linear-gradient(90deg, #ef4444, #dc2626)' : 'linear-gradient(90deg, #f59e0b, #d97706)'
+                      }}></div>
+                    </div>
+                    <strong style={{ color: (selectedEntity.risk_score || 5) >= 8 ? '#dc2626' : '#d97706', fontSize: '1.1rem', fontWeight: 900 }}>
+                      {selectedEntity.risk_score || 5}/10
+                    </strong>
+                  </div>
+                </div>
+
+                {/* STRUCTURED POLICE DOSSIER METADATA GRID */}
+                {selectedEntity.secondary_info && typeof selectedEntity.secondary_info === 'object' && (
+                  <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', overflow: 'hidden' }}>
+                    <div style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', padding: '0.6rem 0.9rem', fontSize: '0.72rem', color: '#0b1e36', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      📋 POLICE INTELLIGENCE METADATA
+                    </div>
+
+                    <div style={{ padding: '0.75rem 0.9rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                      {selectedEntity.secondary_info.name && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                          <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>👤 Full Name:</span>
+                          <strong style={{ color: '#0b1e36', fontSize: '0.86rem' }}>{selectedEntity.secondary_info.name}</strong>
+                        </div>
+                      )}
+
+                      {selectedEntity.secondary_info.alias && selectedEntity.secondary_info.alias !== 'N/A' && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                          <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>🏷️ Alias / Moniker:</span>
+                          <span style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 800 }}>
+                            {selectedEntity.secondary_info.alias}
+                          </span>
+                        </div>
+                      )}
+
+                      {selectedEntity.secondary_info.station_name && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                          <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>🏢 Police Station:</span>
+                          <strong style={{ color: '#0b1e36', fontSize: '0.84rem' }}>{selectedEntity.secondary_info.station_name}</strong>
+                        </div>
+                      )}
+
+                      {selectedEntity.secondary_info.modus_operandi && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                          <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>📜 Crime Category / MO:</span>
+                          <span style={{ background: '#f3e8ff', color: '#6b21a8', border: '1px solid #d8b4fe', padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 800 }}>
+                            {selectedEntity.secondary_info.modus_operandi}
+                          </span>
+                        </div>
+                      )}
+
+                      {selectedEntity.secondary_info.linked_case && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                          <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>📄 FIR File No:</span>
+                          <strong style={{ color: '#1d4ed8', fontSize: '0.84rem', fontFamily: 'monospace' }}>#{selectedEntity.secondary_info.linked_case}</strong>
+                        </div>
+                      )}
+
+                      {selectedEntity.secondary_info.status && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                          <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>⚖️ Legal Status:</span>
+                          <span style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 800 }}>
+                            {selectedEntity.secondary_info.status}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Additional Custom Metadata Fields (Formatted cleanly without text overlap) */}
+                      {Object.entries(selectedEntity.secondary_info)
+                        .filter(([key]) => !['name', 'alias', 'station_name', 'modus_operandi', 'linked_case', 'status', 'notes'].includes(key))
+                        .map(([key, val]) => {
+                          const strVal = String(val ?? '');
+                          const isLong = strVal.length > 25;
+                          const formattedKey = key.replace(/_/g, ' ').toUpperCase();
+
+                          if (isLong) {
+                            return (
+                              <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingBottom: '0.55rem', borderBottom: '1px solid #f1f5f9' }}>
+                                <span style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                                  {formattedKey}
+                                </span>
+                                <div style={{ color: '#0b1e36', fontSize: '0.84rem', fontWeight: 700, lineHeight: '1.45', background: '#f8fafc', padding: '6px 10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                                  {strVal}
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9', gap: '12px' }}>
+                              <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>
+                                {formattedKey}:
+                              </span>
+                              <strong style={{ color: '#0b1e36', fontSize: '0.84rem', textAlign: 'right', wordBreak: 'break-word' }}>
+                                {strVal}
+                              </strong>
+                            </div>
+                          );
+                        })
+                      }
+                    </div>
+                  </div>
+                )}
+
+                {/* VERBATIM INVESTIGATION NOTES PANEL */}
+                {selectedEntity.secondary_info && typeof selectedEntity.secondary_info === 'object' && selectedEntity.secondary_info.notes && (
+                  <div style={{
+                    background: '#fafaf9',
+                    border: '1px solid #e7e5e4',
+                    borderLeft: '4px solid #c5a059',
+                    borderRadius: '6px',
+                    padding: '0.85rem 1rem'
+                  }}>
+                    <div style={{ fontSize: '0.72rem', color: '#78716c', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.4rem', letterSpacing: '0.5px' }}>
+                      💬 VERBATIM INVESTIGATION &amp; SURVEILLANCE NOTES
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.84rem', color: '#292524', lineHeight: '1.5', fontStyle: 'italic' }}>
+                      "{selectedEntity.secondary_info.notes}"
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
-
-            {selectedEntity.secondary_info && (
-              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.85rem', borderRadius: '8px', marginBottom: '1rem' }}>
-                <div style={{ fontSize: '0.75rem', color: '#a4823f', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.4rem' }}>Metadata &amp; Intelligence Notes</div>
-                <pre style={{ margin: 0, color: '#334155', fontSize: '0.82rem', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
-                  {JSON.stringify(selectedEntity.secondary_info, null, 2)}
-                </pre>
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* SLIDE-OVER ADD ENTITY DRAWER */}

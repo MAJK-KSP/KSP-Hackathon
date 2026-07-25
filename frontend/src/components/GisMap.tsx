@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
+import { DbAutocompleteInput } from './DbAutocompleteInput';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -617,13 +618,10 @@ export const GisMap: React.FC = () => {
             
             <div className="filter-input-group">
               <label>{t("Search Keyword")}</label>
-              <input
-                type="text"
-                placeholder={t("Search by FIR ID or landmark...")}
+              <DbAutocompleteInput
+                placeholder={t("Search by FIR ID, landmark, or suspect...")}
                 value={draftSearch}
-                onChange={e => setDraftSearch(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
-                className="map-filter-input"
+                onChange={val => setDraftSearch(val)}
               />
             </div>
 

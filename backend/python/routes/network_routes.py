@@ -59,7 +59,7 @@ async def analyze_criminal_network():
                         police_station AS default_station
                     FROM investigation_cases
                     ORDER BY incident_date DESC
-                    LIMIT 20;
+                    LIMIT 10000;
                 """)
                 fir_rows = cur.fetchall()
 
@@ -77,7 +77,7 @@ async def analyze_criminal_network():
                         LEFT JOIN unit u ON c.policestationid = u.unitid
                         LEFT JOIN crimehead ch ON c.crimemajorheadid = ch.crimeheadid
                         ORDER BY c.crimeregistereddate DESC NULLS LAST
-                        LIMIT 20;
+                        LIMIT 10000;
                     """)
                     cm_rows = cur.fetchall()
                     for cm in cm_rows:
@@ -98,7 +98,7 @@ async def analyze_criminal_network():
                             police_station AS default_station
                         FROM cases
                         ORDER BY reported_date DESC
-                        LIMIT 20;
+                        LIMIT 10000;
                     """)
                     fir_rows = cur.fetchall()
 

@@ -17,6 +17,7 @@ import { UserManagement } from './components/UserManagement';
 import { GisMap } from './components/GisMap';
 import { NetworkAnalysis } from './components/NetworkAnalysis';
 import { DecisionSupport } from './components/DecisionSupport';
+import { FirGenerator } from './components/FirGenerator';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 interface User {
@@ -113,16 +114,31 @@ const AppContent: React.FC = () => {
         />
         <Route path="/map" element={<GisMap />} />
         <Route
+          path="/fir-generator"
+          element={
+            <ProtectedRoute userRole={user.role} allowedRoles={['admin', 'supervisors', 'policymakers']}>
+              <FirGenerator />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/network"
           element={
-            <ProtectedRoute userRole={user.role} allowedRoles={['admin', 'analysts', 'investigators', 'supervisors']}>
+            <ProtectedRoute userRole={user.role} allowedRoles={['admin', 'supervisors', 'analysts']}>
               <NetworkAnalysis />
             </ProtectedRoute>
           }
         />
         <Route path="/chat" element={<AiChat isFullPage={true} />} />
-        <Route path="/decision-support" element={<DecisionSupport />} />
-        <Route path="/profile" element={<Profile />} />
+        <Route
+          path="/decision-support"
+          element={
+            <ProtectedRoute userRole={user.role} allowedRoles={['admin', 'supervisors', 'investigators']}>
+              <DecisionSupport />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/profile" element={<Navigate to="/settings" replace />} />
         <Route path="/settings" element={<Settings user={user} onMfaEnabled={checkSession} />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

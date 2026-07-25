@@ -11,6 +11,7 @@ interface User {
   email: string;
   mfa_enabled: boolean;
   created_at: string;
+  role?: string;
 }
 
 interface LoginProps {
@@ -125,17 +126,26 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               <span className="ksp-title">ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್</span>
               <span className="ksp-title-en">KARNATAKA STATE POLICE</span>
             </div>
-            <svg className="ksp-logo-header" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="55" height="55">
-              <circle cx="100" cy="100" r="95" fill="#0b1e36" stroke="#c5a059" stroke-width="4" />
-              <circle cx="100" cy="100" r="76" fill="none" stroke="#c5a059" stroke-width="1.5" stroke-dasharray="4 2" />
-              <circle cx="100" cy="100" r="58" fill="#ffffff" stroke="#c5a059" stroke-width="3" />
-              <path d="M 75,68 C 75,68 88,64 100,58 C 112,64 125,68 125,68 L 125,98 C 125,118 100,132 100,132 C 100,132 75,118 75,98 Z" fill="#a82329" stroke="#c5a059" stroke-width="2" />
-              <g transform="translate(100, 96) scale(0.7)" fill="#ffe082" stroke="#5c4308" stroke-width="0.5">
-                <path d="M -8,-15 L 8,-15 C 10,-8 12,5 0,16 C -12,5 -10,-8 -8,-15 Z" />
-                <path d="M -6,-12 C -18,-15 -28,-6 -25,12 C -22,18 -15,14 -10,6 C -7,0 -6,-6 -6,-12 Z" />
-                <path d="M 6,-12 C 18,-15 28,-6 25,12 C 22,18 15,14 10,6 C 7,0 6,-6 6,-12 Z" />
-              </g>
-            </svg>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              overflow: 'hidden',
+              border: '2.5px solid #c5a059',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
+              background: '#0b1e36',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '4px',
+              flexShrink: 0
+            }}>
+              <img 
+                src="/ksp-official-logo.png" 
+                alt="Karnataka State Police Emblem" 
+                style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }} 
+              />
+            </div>
           </div>
         </div>
       </header>
@@ -147,7 +157,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           <section className="info-panel">
             <div className="info-card">
               <span className="tag">{t("OFFICIAL INSTRUCTIONS")}</span>
-              <h2>{t("Secure Login Portal")}</h2>
+              <h2>{t("KSP Command Terminal")}</h2>
               <p className="motto-kannada">{t("\"ಸೇವಾ ಧರ್ಮ\" • SERVICE IS DUTY")}</p>
               
               <div className="info-list">
@@ -209,7 +219,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                       type="email" 
                       id="login-email" 
                       required 
-                      placeholder="username@ksp.gov.in" 
+                      placeholder="officer@ksp.gov.in" 
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       autoComplete="off"
@@ -303,7 +313,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           </div>
           <div className="footer-credits">
             <p>{t("Copyright © 2026 Karnataka State Police. All Rights Reserved.")}</p>
-            <p className="nic-branding">{t("Designed & Developed by KSP IT Cell / National Informatics Centre (NIC).")}</p>
+            <p className="nic-branding">{t("Designed & Developed by Team MAJK")}</p>
           </div>
         </div>
       </footer>

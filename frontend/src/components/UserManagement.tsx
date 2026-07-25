@@ -40,6 +40,13 @@ export const UserManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'users' | 'audit'>('users');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
+  // Give Access State
+  const [showGrantModal, setShowGrantModal] = useState(false);
+  const [grantUserId, setGrantUserId] = useState<string | null>(null);
+  const [availableCases, setAvailableCases] = useState<{case_id: string, title: string, case_number: string}[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState('');
+  const [caseSearchQuery, setCaseSearchQuery] = useState('');
+
   // New User Form State
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -153,6 +160,74 @@ export const UserManagement: React.FC = () => {
     }
   };
 
+  const handleDeleteUser = async (userId: string, email: string) => {
+    if (!window.confirm(t('Are you sure you want to permanently delete user: ') + email + '?')) return;
+    
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setUsers(prev => prev.filter(u => u.id !== userId));
+        await fetchAuditLogs();
+        alert(t('User deleted successfully.'));
+      } else {
+        const data = await res.json();
+        alert(data.error || t('Failed to delete user.'));
+      }
+    } catch (err) {
+      alert(t('Network error deleting user.'));
+    }
+  };
+
+  const fetchCasesForGrant = async () => {
+    try {
+      const res = await fetch('/api/admin/cases');
+      if (res.ok) {
+        const data = await res.json();
+        setAvailableCases(data.cases || []);
+        if (data.cases && data.cases.length > 0) {
+          setSelectedCaseId(data.cases[0].case_id);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching cases:', err);
+    }
+  };
+
+  const openGrantModal = (userId: string) => {
+    setGrantUserId(userId);
+    setShowGrantModal(true);
+    setCaseSearchQuery('');
+    fetchCasesForGrant();
+  };
+
+  const handleGrantAccess = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!grantUserId || !selectedCaseId) return;
+
+    try {
+      const res = await fetch(`/api/admin/users/${grantUserId}/grant-case`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ caseId: selectedCaseId })
+      });
+
+      if (res.ok) {
+        alert(t('Access granted successfully with AI summary.'));
+        setShowGrantModal(false);
+        setGrantUserId(null);
+        setSelectedCaseId('');
+        await fetchAuditLogs();
+      } else {
+        const data = await res.json();
+        alert(data.error || t('Failed to grant access.'));
+      }
+    } catch (err) {
+      alert(t('Network error granting access.'));
+    }
+  };
+
   const getRoleBadgeStyle = (role: string) => {
     switch (role.toLowerCase()) {
       case 'investigators':
@@ -161,8 +236,6 @@ export const UserManagement: React.FC = () => {
         return { bg: '#e0e7ff', color: '#3730a3', label: 'Intelligence Analyst' };
       case 'supervisors':
         return { bg: '#fef3c7', color: '#92400e', label: 'Supervisor' };
-      case 'policymakers':
-        return { bg: '#f3e8ff', color: '#6b21a8', label: 'Policy Maker' };
       case 'admin':
         return { bg: '#fee2e2', color: '#991b1b', label: 'Administrator' };
       default:
@@ -252,6 +325,7 @@ export const UserManagement: React.FC = () => {
                 <th style={{ padding: '14px 16px' }}>{t('MFA Status')}</th>
                 <th style={{ padding: '14px 16px' }}>{t('Created Date')}</th>
                 <th style={{ padding: '14px 16px' }}>{t('Change Role')}</th>
+                <th style={{ padding: '14px 16px' }}>{t('Actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -304,10 +378,27 @@ export const UserManagement: React.FC = () => {
                         <option value="investigators">Investigator</option>
                         <option value="analysts">Analyst</option>
                         <option value="supervisors">Supervisor</option>
-                        <option value="policymakers">Policymaker</option>
                         <option value="admin">Admin</option>
                         <option value="officer">Officer</option>
                       </select>
+                    </td>
+                    <td style={{ padding: '14px 16px', display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => handleDeleteUser(u.id, u.email)}
+                        style={{
+                          padding: '6px 10px',
+                          backgroundColor: '#fee2e2',
+                          color: '#dc2626',
+                          border: '1px solid #fca5a5',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          fontSize: '0.85rem'
+                        }}
+                        title={t('Delete User')}
+                      >
+                        🗑️
+                      </button>
                     </td>
                   </tr>
                 );
@@ -425,7 +516,6 @@ export const UserManagement: React.FC = () => {
                     <option value="investigators">Investigator (Crime Investigation)</option>
                     <option value="analysts">Intelligence Analyst (Data & Trends)</option>
                     <option value="supervisors">Supervisor (Station Supervision)</option>
-                    <option value="policymakers">Policymaker (Governance & Policy)</option>
                     <option value="admin">Administrator (System Admin)</option>
                     <option value="officer">Officer (General Duty)</option>
                   </select>
@@ -471,6 +561,7 @@ export const UserManagement: React.FC = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };

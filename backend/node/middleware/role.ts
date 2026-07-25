@@ -62,6 +62,10 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'daily_briefings',
     'macro_statistics'
   ],
+  judiciary: [
+    'view_overview',
+    'view_decision_support'
+  ],
   officer: [
     'view_overview',
     'view_gis_map',

@@ -38,6 +38,8 @@ import { aiRouter } from './routes/ai';
 import { adminRouter } from './routes/admin';
 import { decisionSupportRouter } from './routes/decision_support';
 import { entityResolutionRouter, initNetworkSchema } from './routes/entityResolution';
+import { firRouter } from './routes/fir';
+import { translateResponse } from './middleware/translate';
 
 dotenv.config();
 
@@ -67,6 +69,7 @@ app.use(securityHeaders);
 
 // Apply general rate limiting to API endpoints only
 app.use('/api', generalLimiter);
+app.use('/api', translateResponse);
 
 // Serve frontend static files (prioritizing compiled React build)
 const publicPath = fs.existsSync(path.resolve(__dirname, '../dist/public'))
@@ -179,6 +182,12 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000, // 1 day
     });
 
+    // Fetch role
+    const roleRecord = await getRow<{ role: string }>(
+      'SELECT role FROM user_roles WHERE user_id = ?',
+      [user.id]
+    );
+
     return res.status(200).json({
       success: true,
       user: {
@@ -186,6 +195,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         email: user.email,
         mfa_enabled: Boolean(user.mfa_enabled),
         created_at: user.created_at,
+        role: roleRecord?.role || 'officer',
       },
     });
   } catch (error) {
@@ -304,6 +314,12 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000,
     });
 
+    // Fetch role
+    const roleRecord = await getRow<{ role: string }>(
+      'SELECT role FROM user_roles WHERE user_id = ?',
+      [userRecord.id]
+    );
+
     return res.status(200).json({
       success: true,
       user: {
@@ -311,6 +327,7 @@ app.post('/api/auth/mfa/verify', authLimiter, async (req, res) => {
         email: userRecord.email,
         mfa_enabled: true,
         created_at: userRecord.created_at,
+        role: roleRecord?.role || 'officer',
       },
     });
   } catch (error) {
@@ -692,7 +709,7 @@ async function loadGisCases(): Promise<any[]> {
       LEFT JOIN public.crimehead ch ON c.crimemajorheadid = ch.crimeheadid
       LEFT JOIN public.casestatusmaster cs ON c.casestatusid = cs.casestatusid
       ORDER BY c.crimeregistereddate DESC NULLS LAST
-      LIMIT 1000;
+      LIMIT 10000;
     `);
 
     for (const cm of casemasterRows) {
@@ -814,6 +831,9 @@ app.use('/api/decision-support', authenticateSession, attachUserRole, decisionSu
 
 // Mount Network Analysis & Entity Resolution routes
 app.use('/api', entityResolutionRouter);
+
+// Mount Official FIR Generator routes
+app.use('/api/fir', authenticateSession, attachUserRole, firRouter);
 
 // Serve static client assets from dist/public (built Vite output)
 const publicDir = path.join(process.cwd(), 'dist/public');

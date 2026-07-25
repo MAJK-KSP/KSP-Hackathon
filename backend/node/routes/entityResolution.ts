@@ -89,7 +89,7 @@ entityResolutionRouter.get('/network-graph/cases-list', async (_req: Request, re
         LEFT JOIN public.unit u ON c.policestationid = u.unitid
         LEFT JOIN public.crimehead ch ON c.crimemajorheadid = ch.crimeheadid
         ORDER BY c.crimeregistereddate DESC NULLS LAST
-        LIMIT 1000;
+        LIMIT 10000;
       `);
       for (const cm of cmCases) {
         if (!casesMap.has(cm.case_number)) {
@@ -201,10 +201,26 @@ entityResolutionRouter.get('/network-graph', async (req: Request, res: Response)
           LEFT JOIN public.unit u ON c.policestationid = u.unitid
           LEFT JOIN public.crimehead ch ON c.crimemajorheadid = ch.crimeheadid
           ORDER BY c.crimeregistereddate DESC NULLS LAST
-          LIMIT 1000;
+          LIMIT 10000;
         `);
       } catch (err: any) {
         console.error('Non-critical historical accused fetch note:', err.message);
+      }
+
+      // 1. Fetch Real Database Entities & Relationships from entities & entity_relationships tables
+      let dbEntities: any[] = [];
+      let dbRelationships: any[] = [];
+      try {
+        dbEntities = await getAllDatasetRows<any>(`
+          SELECT entity_id, entity_type, primary_label, secondary_info, risk_score::float AS risk_score
+          FROM entities;
+        `);
+        dbRelationships = await getAllDatasetRows<any>(`
+          SELECT relationship_id::text AS id, source_entity_id AS source, target_entity_id AS target, relationship_type AS label, evidence_snippet AS evidence, confidence_score::float AS confidence
+          FROM entity_relationships;
+        `);
+      } catch (dbErr: any) {
+        console.error('Non-critical entities table fetch note:', dbErr.message);
       }
 
       // Collect all case IDs and stations associated with searched query name
@@ -241,6 +257,37 @@ entityResolutionRouter.get('/network-graph', async (req: Request, res: Response)
         const stationMatch = Boolean(station && matchingStations.has(station));
         return nameMatch || caseMatch || stationMatch;
       };
+
+      // Add DB entities to nodesMap
+      for (const e of dbEntities) {
+        if (!isOffenderMatched(e.primary_label, null, '', '')) continue;
+        nodesMap[e.entity_id] = {
+          id: e.entity_id,
+          type: e.entity_type,
+          label: e.primary_label,
+          risk_score: e.risk_score || 7.5,
+          cluster_group: 'Organised Crime Syndicate',
+          secondary_info: {
+            name: e.primary_label,
+            status: e.entity_type === 'ACCUSED' ? 'Active Syndicate Suspect' : 'Investigation Asset',
+            ...(typeof e.secondary_info === 'object' ? e.secondary_info : { notes: String(e.secondary_info || '') })
+          }
+        };
+      }
+
+      // Add DB relationships to edgesList
+      for (const r of dbRelationships) {
+        if (nodesMap[r.source] && nodesMap[r.target]) {
+          edgesList.push({
+            id: `edge-db-rel-${r.id}`,
+            source: r.source,
+            target: r.target,
+            label: r.label,
+            evidence: r.evidence || `Direct ${r.label} intelligence relationship`,
+            confidence: r.confidence || 0.95
+          });
+        }
+      }
 
       for (const s of invSuspects) {
         const station = s.police_station || 'KSP Station';
@@ -287,7 +334,8 @@ entityResolutionRouter.get('/network-graph', async (req: Request, res: Response)
       for (const r of repeatOffenders) {
         const station = r.station_name || 'KSP Station';
         const crimeType = 'Repeat Offender Syndicates';
-        if (!isOffenderMatched(r.name, r.alias, station, 'REP-CASE')) continue;
+        const stationCaseId = `REP-STATION-${station.replace(/\s+/g, '-').toLowerCase()}`;
+        if (!isOffenderMatched(r.name, r.alias, station, stationCaseId)) continue;
 
         const nodeId = `REP-${absHash(r.name)}`;
         allOffenders.push({
@@ -297,11 +345,11 @@ entityResolutionRouter.get('/network-graph', async (req: Request, res: Response)
           alias: r.alias,
           station_name: station,
           crime_category: crimeType,
-          case_id: 'REP-CASE',
-          case_number: 'SURVEILLANCE',
+          case_id: stationCaseId,
+          case_number: `SYNDICATE-${station.toUpperCase()}`,
           risk_score: 9.8,
           status: `Repeat Offender (${r.risk_level || 'High Risk'})`,
-          notes: `Total Cases: ${r.total_cases || 'Multiple'}, Address: ${r.address || 'Local'}`
+          notes: `Total Cases: ${r.total_cases || 'Multiple'}, Jurisdiction: ${station}, Address: ${r.address || 'Local'}`
         });
       }
 
@@ -337,7 +385,7 @@ entityResolutionRouter.get('/network-graph', async (req: Request, res: Response)
         }
       }
 
-      // Build Co-Accused / Shared Accomplice Edges (Condition 3: Shared Accomplices)
+      // Rule 1: Direct Co-Accused Link (Confidence: 1.0)
       let edgeCounter = 1;
       for (const [caseId, accList] of Object.entries(caseToOffenders)) {
         for (let i = 0; i < accList.length; i++) {
@@ -354,45 +402,15 @@ entityResolutionRouter.get('/network-graph', async (req: Request, res: Response)
               id: `edge-gang-coacc-${edgeCounter++}`,
               source: u,
               target: v,
-              label: 'CO_ACCUSED_GANG',
-              evidence: `Co-accused accomplices in case #${caseId}`,
+              label: 'CO_ACCUSED',
+              evidence: `Co-accused accomplices in FIR #${caseId}`,
               confidence: 1.0
             });
           }
         }
       }
 
-      // Build Similar MO & Geographical Proximity Edges (Conditions 1 & 2)
-      const keysGroup: Record<string, string[]> = {};
-      for (const o of allOffenders) {
-        const key = `${o.station_name}-${o.crime_category}`;
-        if (!keysGroup[key]) keysGroup[key] = [];
-        if (!keysGroup[key].includes(o.id)) keysGroup[key].push(o.id);
-      }
-
-      for (const [key, accList] of Object.entries(keysGroup)) {
-        for (let i = 0; i < accList.length; i++) {
-          for (let j = i + 1; j < accList.length; j++) {
-            const u = accList[i];
-            const v = accList[j];
-            const alreadyLinked = edgesList.some(e => 
-              (e.source === u && e.target === v) || (e.source === v && e.target === u)
-            );
-            if (!alreadyLinked) {
-              edgesList.push({
-                id: `edge-gang-moarea-${edgeCounter++}`,
-                source: u,
-                target: v,
-                label: 'SAME_MO_&_AREA',
-                evidence: `Operating in same station area (${key.split('-')[0]}) with similar Modus Operandi (${key.split('-')[1]})`,
-                confidence: 0.88
-              });
-            }
-          }
-        }
-      }
-
-      // Link Transitive Accomplices (Shared Accomplice condition)
+      // Rule 2: Shared Transitive Accomplices (Confidence: 0.95)
       const offenderIds = Object.keys(nodesMap);
       for (let i = 0; i < offenderIds.length; i++) {
         for (let j = i + 1; j < offenderIds.length; j++) {
@@ -416,6 +434,42 @@ entityResolutionRouter.get('/network-graph', async (req: Request, res: Response)
                 label: 'SHARED_ACCOMPLICE',
                 evidence: `Criminal A and Criminal B share ${sharedCount} common co-accused accomplice(s)`,
                 confidence: 0.95
+              });
+            }
+          }
+        }
+      }
+
+      // Rule 3: Specific MO & Landmark Spot Link (Confidence: 0.85)
+      // Only link if exact same crime MO AND exact same landmark spot match!
+      const spotGroup: Record<string, string[]> = {};
+      for (const o of allOffenders) {
+        const spot = (o.notes || o.station_name || '').trim();
+        const key = `${o.crime_category}::${spot}`;
+        if (!spotGroup[key]) spotGroup[key] = [];
+        if (!spotGroup[key].includes(o.id)) spotGroup[key].push(o.id);
+      }
+
+      for (const [key, accList] of Object.entries(spotGroup)) {
+        const parts = key.split('::');
+        const moName = parts[0];
+        const spotName = parts[1];
+
+        for (let i = 0; i < accList.length; i++) {
+          for (let j = i + 1; j < accList.length; j++) {
+            const u = accList[i];
+            const v = accList[j];
+            const alreadyLinked = edgesList.some(e => 
+              (e.source === u && e.target === v) || (e.source === v && e.target === u)
+            );
+            if (!alreadyLinked) {
+              edgesList.push({
+                id: `edge-gang-mospot-${edgeCounter++}`,
+                source: u,
+                target: v,
+                label: 'SHARED_MO_SPOT',
+                evidence: `Identical specific MO (${moName}) at shared hotspot location (${spotName})`,
+                confidence: 0.85
               });
             }
           }
@@ -456,7 +510,138 @@ entityResolutionRouter.get('/network-graph', async (req: Request, res: Response)
 
     let targetCase: any = null;
 
-    if (caseIdParam) {
+    // 1. Prioritize Search Query (queryParam) if user typed or selected a suspect / FIR / landmark / repeat offender
+    if (queryParam) {
+      // 0. Check if queryParam matches a repeat offender record
+      try {
+        const repRows = await getAllDatasetRows<any>(`
+          SELECT name, alias, risk_level, total_cases, station_name, address
+          FROM repeat_offenders
+          WHERE LOWER(name) LIKE $1 OR LOWER(alias) LIKE $1
+          LIMIT 1;
+        `, [`%${queryParam}%`]);
+        if (repRows && repRows.length > 0) {
+          const r = repRows[0];
+          const rCase = await getAllDatasetRows<any>(`
+            SELECT case_id, case_number, title, crime_type, police_station, status, incident_date, location, description, investigating_officer
+            FROM investigation_cases
+            WHERE LOWER(police_station) LIKE $1 OR LOWER(description) LIKE $2 OR LOWER(title) LIKE $2
+            LIMIT 1;
+          `, [`%${(r.station_name || '').toLowerCase()}%`, `%${r.name.toLowerCase()}%`]);
+          if (rCase && rCase.length > 0) {
+            targetCase = { ...rCase[0], source: 'investigation_cases' };
+          }
+        }
+      } catch (e) {
+        // Fallback
+      }
+
+      if (!targetCase) {
+        try {
+          const suspCase = await getAllDatasetRows<any>(`
+            SELECT c.case_id, c.case_number, c.title, c.crime_type, c.police_station, c.status, c.incident_date, c.location, c.description, c.investigating_officer
+            FROM investigation_suspects s
+            JOIN investigation_cases c ON s.case_id = c.case_id
+            WHERE LOWER(s.name) LIKE $1 OR LOWER(s.alias) LIKE $1
+            LIMIT 1;
+          `, [`%${queryParam}%`]);
+          if (suspCase && suspCase.length > 0) {
+            targetCase = { ...suspCase[0], source: 'investigation_cases' };
+          }
+        } catch (e) {
+          // Fallback
+        }
+      }
+
+      if (!targetCase) {
+        try {
+          const cmAccusedCase = await getAllDatasetRows<any>(`
+            SELECT 
+              c.casemasterid::text AS case_id,
+              c.caseno AS case_number,
+              COALESCE(c.brieffacts, 'Historical FIR Case') AS title,
+              COALESCE(ch.crimegroupname, 'Crimes Against Property') AS crime_type,
+              COALESCE(u.unitname, 'Karnataka State Police Station') AS police_station,
+              COALESCE(cs.casestatusname, 'Active') AS status,
+              TO_CHAR(c.crimeregistereddate, 'YYYY-MM-DD') AS incident_date,
+              COALESCE(c.landmark, 'Jurisdiction Area') AS location,
+              COALESCE(c.brieffacts, 'No brief facts recorded.') AS description,
+              'Station House Officer' AS investigating_officer
+            FROM public.accused a
+            JOIN public.casemaster c ON a.casemasterid = c.casemasterid
+            LEFT JOIN public.unit u ON c.policestationid = u.unitid
+            LEFT JOIN public.crimehead ch ON c.crimemajorheadid = ch.crimeheadid
+            LEFT JOIN public.casestatusmaster cs ON c.casestatusid = cs.casestatusid
+            WHERE LOWER(a.accusedname) LIKE $1
+            LIMIT 1;
+          `, [`%${queryParam}%`]);
+          if (cmAccusedCase && cmAccusedCase.length > 0) {
+            targetCase = { ...cmAccusedCase[0], source: 'casemaster' };
+          }
+        } catch (e) {
+          // Fallback
+        }
+      }
+
+      if (!targetCase) {
+        const matchedInv = await getAllDatasetRows<any>(`
+          SELECT 
+            case_id, case_number, title, crime_type, police_station, status, incident_date, location, description, investigating_officer
+          FROM investigation_cases
+          WHERE LOWER(case_number) LIKE $1 OR LOWER(title) LIKE $1 OR LOWER(description) LIKE $1 OR LOWER(police_station) LIKE $1
+          LIMIT 1;
+        `, [`%${queryParam}%`]);
+        if (matchedInv && matchedInv.length > 0) {
+          targetCase = { ...matchedInv[0], source: 'investigation_cases' };
+        } else {
+          const matchedFir = await getAllDatasetRows<any>(`
+            SELECT 
+              id AS case_id,
+              case_number,
+              crime_type AS title,
+              crime_type,
+              police_station,
+              status,
+              reported_date::text AS incident_date,
+              landmark AS location,
+              landmark AS description,
+              'Inspector R. Shankara' AS investigating_officer
+            FROM cases
+            WHERE LOWER(case_number) LIKE $1 OR LOWER(landmark) LIKE $1 OR LOWER(police_station) LIKE $1
+            LIMIT 1;
+          `, [`%${queryParam}%`]);
+          if (matchedFir && matchedFir.length > 0) {
+            targetCase = { ...matchedFir[0], source: 'cases' };
+          } else {
+            const matchedCm = await getAllDatasetRows<any>(`
+              SELECT 
+                c.casemasterid::text AS case_id,
+                c.caseno AS case_number,
+                COALESCE(c.brieffacts, 'Historical FIR Case') AS title,
+                COALESCE(ch.crimegroupname, 'Crimes Against Property') AS crime_type,
+                COALESCE(u.unitname, 'Karnataka State Police Station') AS police_station,
+                COALESCE(cs.casestatusname, 'Active') AS status,
+                TO_CHAR(c.crimeregistereddate, 'YYYY-MM-DD') AS incident_date,
+                COALESCE(c.landmark, 'Jurisdiction Area') AS location,
+                COALESCE(c.brieffacts, 'No brief facts recorded.') AS description,
+                'Station House Officer' AS investigating_officer
+              FROM public.casemaster c
+              LEFT JOIN public.unit u ON c.policestationid = u.unitid
+              LEFT JOIN public.crimehead ch ON c.crimemajorheadid = ch.crimeheadid
+              LEFT JOIN public.casestatusmaster cs ON c.casestatusid = cs.casestatusid
+              WHERE LOWER(c.caseno) LIKE $1 OR LOWER(c.brieffacts) LIKE $1 OR LOWER(c.landmark) LIKE $1
+              LIMIT 1;
+            `, [`%${queryParam}%`]);
+            if (matchedCm && matchedCm.length > 0) {
+              targetCase = { ...matchedCm[0], source: 'casemaster' };
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Fallback to explicitly selected case_id dropdown selection
+    if (!targetCase && caseIdParam) {
       const invCaseRows = await getAllDatasetRows<any>(`
         SELECT 
           case_id,
@@ -501,62 +686,6 @@ entityResolutionRouter.get('/network-graph', async (req: Request, res: Response)
       `, [cmId, cmId.toLowerCase()]);
       if (cmCaseRows && cmCaseRows.length > 0) {
         targetCase = { ...cmCaseRows[0], source: 'casemaster' };
-      }
-    }
-
-    if (!targetCase && queryParam) {
-      const matchedInv = await getAllDatasetRows<any>(`
-        SELECT 
-          case_id, case_number, title, crime_type, police_station, status, incident_date, location, description, investigating_officer
-        FROM investigation_cases
-        WHERE LOWER(case_number) LIKE $1 OR LOWER(title) LIKE $1 OR LOWER(description) LIKE $1 OR LOWER(police_station) LIKE $1
-        LIMIT 1;
-      `, [`%${queryParam}%`]);
-      if (matchedInv && matchedInv.length > 0) {
-        targetCase = { ...matchedInv[0], source: 'investigation_cases' };
-      } else {
-        const matchedFir = await getAllDatasetRows<any>(`
-          SELECT 
-            id AS case_id,
-            case_number,
-            crime_type AS title,
-            crime_type,
-            police_station,
-            status,
-            reported_date::text AS incident_date,
-            landmark AS location,
-            landmark AS description,
-            'Inspector R. Shankara' AS investigating_officer
-          FROM cases
-          WHERE LOWER(case_number) LIKE $1 OR LOWER(landmark) LIKE $1 OR LOWER(police_station) LIKE $1
-          LIMIT 1;
-        `, [`%${queryParam}%`]);
-        if (matchedFir && matchedFir.length > 0) {
-          targetCase = { ...matchedFir[0], source: 'cases' };
-        } else {
-          const matchedCm = await getAllDatasetRows<any>(`
-            SELECT 
-              c.casemasterid::text AS case_id,
-              c.caseno AS case_number,
-              COALESCE(c.brieffacts, 'Historical FIR Case') AS title,
-              COALESCE(ch.crimegroupname, 'Crimes Against Property') AS crime_type,
-              COALESCE(u.unitname, 'Karnataka State Police Station') AS police_station,
-              COALESCE(cs.casestatusname, 'Active') AS status,
-              TO_CHAR(c.crimeregistereddate, 'YYYY-MM-DD') AS incident_date,
-              COALESCE(c.landmark, 'Jurisdiction Area') AS location,
-              COALESCE(c.brieffacts, 'No brief facts recorded.') AS description,
-              'Station House Officer' AS investigating_officer
-            FROM public.casemaster c
-            LEFT JOIN public.unit u ON c.policestationid = u.unitid
-            LEFT JOIN public.crimehead ch ON c.crimemajorheadid = ch.crimeheadid
-            LEFT JOIN public.casestatusmaster cs ON c.casestatusid = cs.casestatusid
-            WHERE LOWER(c.caseno) LIKE $1 OR LOWER(c.brieffacts) LIKE $1 OR LOWER(c.landmark) LIKE $1
-            LIMIT 1;
-          `, [`%${queryParam}%`]);
-          if (matchedCm && matchedCm.length > 0) {
-            targetCase = { ...matchedCm[0], source: 'casemaster' };
-          }
-        }
       }
     }
 
@@ -658,6 +787,52 @@ entityResolutionRouter.get('/network-graph', async (req: Request, res: Response)
     }
 
     const accusedNodeIds: string[] = [];
+
+    // Inject Repeat Offenders in this Police Station or matching search query into the central network
+    try {
+      const stationClean = (targetCase.police_station || '').toLowerCase().replace(/\s+police\s+station/i, '').replace(/\s+ps/i, '').trim();
+      const qClean = (queryParam || '').toLowerCase().trim();
+
+      const repOffenders = await getAllDatasetRows<any>(`
+        SELECT name, alias, risk_level, total_cases, station_name, address
+        FROM repeat_offenders
+        WHERE ($1 <> '' AND LOWER(station_name) LIKE $2)
+           OR ($3 <> '' AND (LOWER(name) LIKE $4 OR LOWER(alias) LIKE $4));
+      `, [stationClean, `%${stationClean}%`, qClean, `%${qClean}%`]);
+
+      for (const r of repOffenders) {
+        const nodeId = `REP-${absHash(r.name)}`;
+        if (!nodesMap[nodeId]) {
+          accusedNodeIds.push(nodeId);
+          nodesMap[nodeId] = {
+            id: nodeId,
+            type: 'ACCUSED',
+            label: r.alias ? `${r.name} (${r.alias})` : r.name,
+            risk_score: 9.8,
+            secondary_info: {
+              name: r.name,
+              alias: r.alias || 'N/A',
+              station_name: r.station_name,
+              modus_operandi: 'Repeat Offender Surveillance',
+              linked_case: targetCase.case_number,
+              status: `Repeat Offender (${r.risk_level || 'High Risk'})`,
+              notes: `Registered Repeat Offender. Total Cases: ${r.total_cases || 'Multiple'}, Address: ${r.address || 'Local'}`
+            }
+          };
+
+          edgesList.push({
+            id: `edge-rep-${r.id}`,
+            source: centralFirId,
+            target: nodeId,
+            label: 'REPEAT_OFFENDER_SURVEILLANCE',
+            evidence: `Registered Repeat Offender operating in ${r.station_name} jurisdiction`,
+            confidence: 0.95
+          });
+        }
+      }
+    } catch (rErr: any) {
+      console.error('Non-critical repeat offender fetch note:', rErr.message);
+    }
 
     for (const s of suspectRows) {
       const nodeId = `SUSP-${s.id}`;
@@ -984,3 +1159,140 @@ entityResolutionRouter.post('/network-graph/entity', async (req: Request, res: R
     return res.status(500).json({ error: 'Failed to insert new entity' });
   }
 });
+
+/**
+ * GET /api/network-graph/autocomplete
+ * 100% DB-Connected Search Autocomplete / Typeahead API.
+ * Queries PostgreSQL database tables for suspects, FIR cases, locations, stations, and officers.
+ */
+entityResolutionRouter.get('/network-graph/autocomplete', async (req: Request, res: Response) => {
+  try {
+    const query = String(req.query.q || '').trim().toLowerCase();
+    if (!query || query.length < 1) {
+      return res.status(200).json({ query: '', suggestions: [] });
+    }
+
+    const suggestionsMap = new Map<string, any>();
+
+    // 1. Query Suspects from investigation_suspects
+    try {
+      const invSuspects = await getAllDatasetRows<any>(`
+        SELECT s.id, s.name, s.alias, s.status, c.case_number, c.police_station, c.case_id
+        FROM investigation_suspects s
+        JOIN investigation_cases c ON s.case_id = c.case_id
+        WHERE LOWER(s.name) LIKE $1 OR LOWER(s.alias) LIKE $1 OR LOWER(c.case_number) LIKE $1
+        LIMIT 6;
+      `, [`%${query}%`]);
+
+      for (const s of invSuspects) {
+        const key = `SUSP-${s.name.toLowerCase()}`;
+        if (!suggestionsMap.has(key)) {
+          suggestionsMap.set(key, {
+            id: s.id,
+            label: s.alias ? `${s.name} (${s.alias})` : s.name,
+            type: 'ACCUSED',
+            icon: '🔴',
+            sub: `${s.police_station || 'KSP Station'} • FIR #${s.case_number || 'ACTIVE'}`,
+            value: s.name,
+            related_case_id: s.case_id
+          });
+        }
+      }
+    } catch (e) {
+      // Fallback
+    }
+
+    // 2. Query Cases / FIRs from investigation_cases and cases
+    try {
+      const cases = await getAllDatasetRows<any>(`
+        SELECT case_id, case_number, title, crime_type, police_station, location
+        FROM investigation_cases
+        WHERE LOWER(case_number) LIKE $1 OR LOWER(title) LIKE $1 OR LOWER(crime_type) LIKE $1 OR LOWER(location) LIKE $1
+        LIMIT 6;
+      `, [`%${query}%`]);
+
+      for (const c of cases) {
+        const key = `CASE-${c.case_number}`;
+        if (!suggestionsMap.has(key)) {
+          suggestionsMap.set(key, {
+            id: c.case_id,
+            label: `FIR #${c.case_number} — ${c.title}`,
+            type: 'INCIDENT',
+            icon: '🟡',
+            sub: `${c.police_station} • ${c.crime_type}`,
+            value: c.case_number
+          });
+        }
+      }
+    } catch (e) {
+      // Fallback
+    }
+
+    // 3. Query Repeat Offenders
+    try {
+      const repeatOffenders = await getAllDatasetRows<any>(`
+        SELECT station_name, briefing_date, r->>'name' AS name, r->>'alias' AS alias, r->>'risk_level' AS risk_level
+        FROM daily_operational_data,
+        LATERAL jsonb_array_elements(data->'repeat_offenders') AS r
+        WHERE LOWER(r->>'name') LIKE $1 OR LOWER(r->>'alias') LIKE $1
+        LIMIT 5;
+      `, [`%${query}%`]);
+
+      for (const r of repeatOffenders) {
+        if (r.name) {
+          const key = `REP-${r.name.toLowerCase()}`;
+          if (!suggestionsMap.has(key)) {
+            suggestionsMap.set(key, {
+              id: `rep_${r.name}`,
+              label: r.alias ? `${r.name} (${r.alias})` : r.name,
+              type: 'ACCUSED',
+              icon: '🔴',
+              sub: `Repeat Offender • ${r.station_name} • Risk ${r.risk_level || 'HIGH'}`,
+              value: r.name
+            });
+          }
+        }
+      }
+    } catch (e) {
+      // Fallback
+    }
+
+    // 4. Query Historical FIR Accused from casemaster
+    try {
+      const cmAccused = await getAllDatasetRows<any>(`
+        SELECT a.accusedname AS name, a.caseno AS case_number, u.unitname AS station_name, a.casemasterid AS case_id
+        FROM public.accused a
+        LEFT JOIN public.casemaster c ON a.casemasterid = c.casemasterid
+        LEFT JOIN public.unit u ON c.policestationid = u.unitid
+        WHERE LOWER(a.accusedname) LIKE $1
+        LIMIT 5;
+      `, [`%${query}%`]);
+
+      for (const a of cmAccused) {
+        if (a.name) {
+          const key = `CM-${a.name.toLowerCase()}`;
+          if (!suggestionsMap.has(key)) {
+            suggestionsMap.set(key, {
+              id: `cm_${a.name}`,
+              label: a.name,
+              type: 'ACCUSED',
+              icon: '🔴',
+              sub: `${a.station_name || 'KSP Station'} • Historical FIR #${a.case_number || 'ARCHIVED'}`,
+              value: a.name,
+              related_case_id: a.case_id
+            });
+          }
+        }
+      }
+    } catch (e) {
+      // Fallback
+    }
+
+    const suggestions = Array.from(suggestionsMap.values()).slice(0, 8);
+    return res.status(200).json({ query, suggestions });
+  } catch (err: any) {
+    console.error('Error fetching autocomplete suggestions:', err);
+    return res.status(500).json({ error: 'Autocomplete query failed' });
+  }
+});
+
