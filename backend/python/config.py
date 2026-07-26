@@ -44,8 +44,15 @@ class Settings(BaseSettings):
     app_port: int = 8000
 
     # Database
-    database_url: str = "postgresql://postgres.elvwfsventokcoetasut:IqvA17IiPkCLd43@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres"
-    auth_database_url: str = "postgresql://postgres.zhqzhyzxfewkkfsjevmq:Paremyalil%402005@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres"
+    from pydantic import Field
+    database_url: str = Field(
+        default="postgresql://postgres.elvwfsventokcoetasut:IqvA17IiPkCLd43@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres",
+        alias="DATASET_DATABASE_URL"
+    )
+    auth_database_url: str = Field(
+        default="postgresql://postgres.zhqzhyzxfewkkfsjevmq:Paremyalil%402005@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres",
+        alias="DATABASE_URL"
+    )
 
     def __init__(self, **data):
         super().__init__(**data)

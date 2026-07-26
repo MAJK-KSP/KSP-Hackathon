@@ -1,0 +1,6 @@
+{
+  "command": "sh start.sh",
+  "stack": "python_3_11",
+  "build_path": ".",
+  "env_variables": {}
+}
