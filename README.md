@@ -176,4 +176,4 @@ ZOHO_REFRESH_TOKEN=YOUR_ZOHO_REFRESH_TOKEN
 Developed by **Team MAJK** for the **Karnataka State Police Datathon 2026**.
 
 * **Designed & Developed by:** Team MAJK
-* **Copyright:** © 2026 Karnataka State Police. All Rights Reserved.
+
