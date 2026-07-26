@@ -269,7 +269,6 @@ export const UserManagement: React.FC = () => {
           onClick={() => { setShowCreateModal(true); setFormError(null); setFormSuccess(null); }}
           style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '8px' }}
         >
-          <span>➕</span>
           <span>{t('Create New User')}</span>
         </button>
       </div>
@@ -289,7 +288,7 @@ export const UserManagement: React.FC = () => {
             fontSize: '0.95rem'
           }}
         >
-          👥 {t('User Directory & Roles')} ({users.length})
+          {t('User Directory & Roles')} ({users.length})
         </button>
 
         <button
@@ -305,7 +304,7 @@ export const UserManagement: React.FC = () => {
             fontSize: '0.95rem'
           }}
         >
-          🔐 {t('Cryptographic Audit Trail')} ({auditLogs.length})
+          {t('Cryptographic Audit Trail')} ({auditLogs.length})
         </button>
       </div>
 

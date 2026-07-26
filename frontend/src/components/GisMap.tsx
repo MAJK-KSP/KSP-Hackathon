@@ -380,10 +380,10 @@ export const GisMap: React.FC = () => {
                 </div>
                 <div class="popup-body">
                   <h4 class="popup-title">${t(c.crime_type)}</h4>
-                  <p>📍 <strong>${t("Landmark")}:</strong> ${c.landmark}</p>
-                  <p>🏢 <strong>${t("Station")}:</strong> ${t(c.police_station)}</p>
-                  <p>📅 <strong>${t("Date")}:</strong> ${c.reported_date}</p>
-                  <p>🔎 <em>Click marker to view full dossier</em></p>
+                  <p><strong>${t("Landmark")}:</strong> ${c.landmark}</p>
+                  <p><strong>${t("Station")}:</strong> ${t(c.police_station)}</p>
+                  <p><strong>${t("Date")}:</strong> ${c.reported_date}</p>
+                  <p><em>Click marker to view full dossier</em></p>
                 </div>
               </div>
             `;
@@ -407,7 +407,7 @@ export const GisMap: React.FC = () => {
             
             const popupHtml = `
               <div class="map-popup-card cluster-popup">
-                <h4>📂 ${count} ${t("Cases in this Area")}</h4>
+                <h4>${count} ${t("Cases in this Area")}</h4>
                 <div class="popup-cluster-list">
                   ${cluster.cases.slice(0, 4).map(c => `
                     <div class="cluster-list-item">
@@ -416,7 +416,7 @@ export const GisMap: React.FC = () => {
                   `).join('')}
                   ${count > 4 ? `<div class="cluster-more-text">+ ${count - 4} ${t("more cases")}</div>` : ''}
                 </div>
-                <p style="margin-top: 6px; font-size: 0.75rem; color: #64748b;">👉 Click cluster to inspect full list & location facts</p>
+                <p style="margin-top: 6px; font-size: 0.75rem; color: #64748b;">Click cluster to inspect full list & location facts</p>
               </div>
             `;
             marker.bindPopup(popupHtml, { minWidth: 220 });
@@ -569,13 +569,13 @@ export const GisMap: React.FC = () => {
               className={`map-ctrl-btn ${viewMode === 'markers' ? 'active' : ''}`}
               onClick={() => setViewMode('markers')}
             >
-              📍 {t("Marker Clusters")}
+              {t("Marker Clusters")}
             </button>
             <button 
               className={`map-ctrl-btn ${viewMode === 'heatmap' ? 'active' : ''}`}
               onClick={() => setViewMode('heatmap')}
             >
-              🔥 {t("Heatmap Density")}
+              {t("Heatmap Density")}
             </button>
           </div>
 
@@ -598,7 +598,7 @@ export const GisMap: React.FC = () => {
               fontWeight: 700,
               color: '#0f172a'
             }}>
-              <span>🔥 {t("Crime Heat Density")}:</span>
+              <span>{t("Crime Heat Density")}:</span>
               <div style={{
                 width: '120px',
                 height: '10px',
@@ -614,7 +614,7 @@ export const GisMap: React.FC = () => {
         <aside className="map-sidebar-control-panel">
           {/* Section 1: Filters */}
           <div className="sidebar-card">
-            <h3>🔍 {t("Filter Cases")}</h3>
+            <h3>{t("Filter Cases")}</h3>
             
             <div className="filter-input-group">
               <label>{t("Search Keyword")}</label>
@@ -682,26 +682,26 @@ export const GisMap: React.FC = () => {
                 className="map-filter-select"
               >
                 <option value="">{t("All Statuses")}</option>
-                <option value="Active">🔴 {t("Active Cases")}</option>
-                <option value="Under Investigation">🟠 {t("Unsolved Cases")} ({t("Under Investigation")})</option>
-                <option value="Closed">🟢 {t("Solved Cases")} ({t("Closed")})</option>
+                <option value="Active">{t("Active Cases")}</option>
+                <option value="Under Investigation">{t("Unsolved Cases")} ({t("Under Investigation")})</option>
+                <option value="Closed">{t("Solved Cases")} ({t("Closed")})</option>
               </select>
             </div>
 
             {/* Search & Reset Buttons */}
             <div className="filter-actions-row">
               <button className="search-cases-btn" onClick={handleSearch}>
-                🔍 {t("Search Cases")}
+                {t("Search Cases")}
               </button>
               <button className="reset-cases-btn" onClick={handleReset}>
-                ↻ {t("Reset")}
+                {t("Reset")}
               </button>
             </div>
           </div>
 
           {/* Section 2: Summary Stats */}
           <div className="sidebar-card summary-card">
-            <h3>📊 {t("Total Cases")}</h3>
+            <h3>{t("Total Cases")}</h3>
             <div className="big-number-indicator">
               {loading ? (
                 <div className="map-loader-mini"></div>
@@ -739,19 +739,19 @@ export const GisMap: React.FC = () => {
         <div className="gis-dossier-overlay" onClick={() => setSelectedCluster(null)}>
           <div className="gis-dossier-modal" onClick={e => e.stopPropagation()}>
             <div className="gis-dossier-header">
-              <h3>📂 {t("Cluster Location Inspection")} ({selectedCluster.cases.length} {t("Cases")})</h3>
+              <h3>{t("Cluster Location Inspection")} ({selectedCluster.cases.length} {t("Cases")})</h3>
               <button className="gis-dossier-close" onClick={() => setSelectedCluster(null)}>×</button>
             </div>
             <div className="gis-dossier-body">
               <div className="dossier-badge-row">
                 <span className="dossier-tag status-active">
-                  🔴 {selectedCluster.cases.filter(c => c.status === 'Active').length} {t("Active")}
+                  {selectedCluster.cases.filter(c => c.status === 'Active').length} {t("Active")}
                 </span>
                 <span className="dossier-tag status-solved">
-                  🟢 {selectedCluster.cases.filter(c => c.status === 'Closed').length} {t("Closed")}
+                  {selectedCluster.cases.filter(c => c.status === 'Closed').length} {t("Closed")}
                 </span>
                 <span className="dossier-tag status-investigation">
-                  🟠 {selectedCluster.cases.filter(c => c.status !== 'Active' && c.status !== 'Closed').length} {t("Under Investigation")}
+                  {selectedCluster.cases.filter(c => c.status !== 'Active' && c.status !== 'Closed').length} {t("Under Investigation")}
                 </span>
               </div>
 

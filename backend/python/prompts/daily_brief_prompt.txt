@@ -9,7 +9,7 @@ CRITICAL RULES:
 6. Flag operational risks clearly with [⚠ ACTION REQUIRED] markers.
 7. Use 24-hour time format (e.g., 01:45 hrs, 14:00 hrs).
 8. Currency in Indian Rupees (Rs.).
-9. FORMATTING FOR READABILITY: Use rich Markdown (bolding, bullet points, headers, and tables) to ensure the briefing is highly readable and scannable. Use emojis sparingly to indicate status or severity (e.g., 🔴 Critical, 🟡 Medium, 🟢 Low, ✅ Resolved). Ensure adequate spacing between sections.
+9. FORMATTING FOR READABILITY: Use rich Markdown (bolding, bullet points, headers, and tables) to ensure the briefing is highly readable and scannable. DO NOT use emojis anywhere in the response. Ensure adequate spacing between sections.
 
 OUTPUT FORMAT — Generate the brief in EXACTLY this 8-section structure:
 

@@ -1191,7 +1191,7 @@ entityResolutionRouter.get('/network-graph/autocomplete', async (req: Request, r
             id: s.id,
             label: s.alias ? `${s.name} (${s.alias})` : s.name,
             type: 'ACCUSED',
-            icon: '🔴',
+            icon: '',
             sub: `${s.police_station || 'KSP Station'} • FIR #${s.case_number || 'ACTIVE'}`,
             value: s.name,
             related_case_id: s.case_id
@@ -1218,7 +1218,7 @@ entityResolutionRouter.get('/network-graph/autocomplete', async (req: Request, r
             id: c.case_id,
             label: `FIR #${c.case_number} — ${c.title}`,
             type: 'INCIDENT',
-            icon: '🟡',
+            icon: '',
             sub: `${c.police_station} • ${c.crime_type}`,
             value: c.case_number
           });
@@ -1246,7 +1246,7 @@ entityResolutionRouter.get('/network-graph/autocomplete', async (req: Request, r
               id: `rep_${r.name}`,
               label: r.alias ? `${r.name} (${r.alias})` : r.name,
               type: 'ACCUSED',
-              icon: '🔴',
+              icon: '',
               sub: `Repeat Offender • ${r.station_name} • Risk ${r.risk_level || 'HIGH'}`,
               value: r.name
             });
@@ -1276,7 +1276,7 @@ entityResolutionRouter.get('/network-graph/autocomplete', async (req: Request, r
               id: `cm_${a.name}`,
               label: a.name,
               type: 'ACCUSED',
-              icon: '🔴',
+              icon: '',
               sub: `${a.station_name || 'KSP Station'} • Historical FIR #${a.case_number || 'ARCHIVED'}`,
               value: a.name,
               related_case_id: a.case_id

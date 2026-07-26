@@ -1,11 +1,11 @@
-# 🚓 KSP Command Terminal
+# KSP Command Terminal
 > **Intelligent Conversational AI & Operational Command Platform for Karnataka State Police**
 
 ![KSP Command Terminal Banner](frontend/public/ksp-official-logo.png)
 
 ---
 
-## 📌 Project Overview
+## Project Overview
 
 The **KSP Command Terminal** is a unified, AI-powered operational intelligence platform built specifically for the Karnataka State Police (KSP). It bridges the gap between field officers and complex relational crime databases by allowing officers to interact with a 51-table database using natural language in **English, Kannada, and Hindi**.
 
@@ -17,19 +17,19 @@ The system automatically parses the query, executes safe read-only SQL queries, 
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
-* 🤖 **Agentic NL2SQL AI Assistant:** Powered by **Zoho Catalyst QuickML (Qwen-35B)** and **PydanticAI**, automatically translating natural language queries into precise SQL across 51 database tables.
-* 🛡️ **Zero-Mutation Security Sandbox:** Strict backend query parsing blocks any attempt to run `UPDATE`, `DELETE`, `DROP`, or `INSERT` commands, guaranteeing total database integrity.
-* 🕸️ **Visual Entity Resolution (Network Graph):** Interactive link analysis mapping connections between suspects, phone numbers, vehicles, and historical FIRs to uncover organized crime syndicates.
-* 🗺️ **GIS Spatial Command Map:** Real-time spatial plotting of incident locations, crime density heatmaps, and police station jurisdiction boundaries across Karnataka.
-* 📑 **Automated Multilingual FIR Generator:** Auto-drafts legally structured First Information Reports based on initial incident statements in English, Kannada, or Hindi.
-* 📜 **Chain-of-Custody PDF Exports:** Generates securely formatted, time-stamped, and watermarked PDF dossiers embedded with the officer's badge number, station, and session ID.
-* 🌐 **Native Multilingual UI:** Full trilingual support (English, Kannada, Hindi) with automated translation pipelines.
+* **Agentic NL2SQL AI Assistant:** Powered by **Zoho Catalyst QuickML (Qwen-35B)** and **PydanticAI**, automatically translating natural language queries into precise SQL across 51 database tables.
+* **Zero-Mutation Security Sandbox:** Strict backend query parsing blocks any attempt to run `UPDATE`, `DELETE`, `DROP`, or `INSERT` commands, guaranteeing total database integrity.
+* **Visual Entity Resolution (Network Graph):** Interactive link analysis mapping connections between suspects, phone numbers, vehicles, and historical FIRs to uncover organized crime syndicates.
+* **GIS Spatial Command Map:** Real-time spatial plotting of incident locations, crime density heatmaps, and police station jurisdiction boundaries across Karnataka.
+* **Automated Multilingual FIR Generator:** Auto-drafts legally structured First Information Reports based on initial incident statements in English, Kannada, or Hindi.
+* **Chain-of-Custody PDF Exports:** Generates securely formatted, time-stamped, and watermarked PDF dossiers embedded with the officer's badge number, station, and session ID.
+* **Native Multilingual UI:** Full trilingual support (English, Kannada, Hindi) with automated translation pipelines.
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ```mermaid
 flowchart TD
@@ -79,7 +79,7 @@ flowchart TD
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 * **AI & LLM Gateway:** Zoho Catalyst QuickML (`VL-Qwen3.6-35B-A3B`), PydanticAI Agent Framework
 * **Frontend:** React 18, TypeScript, Vite, Leaflet.js (GIS), Vanilla CSS
@@ -90,7 +90,7 @@ flowchart TD
 
 ---
 
-## 🚀 Quick Start & Installation
+## Quick Start & Installation
 
 ### Prerequisites
 * **Node.js:** v18.x or higher
@@ -129,7 +129,7 @@ uvicorn main:app --reload --port 8000
 
 ---
 
-## ⚙️ Environment Variables Setup
+## Environment Variables Setup
 
 ### Root / Node.js `.env`
 ```env
@@ -150,7 +150,7 @@ ZOHO_REFRESH_TOKEN=YOUR_ZOHO_REFRESH_TOKEN
 
 ---
 
-## 📊 Prototype Performance Summary
+## Prototype Performance Summary
 
 | Metric | Measured Result | Operational Gain |
 | :--- | :--- | :--- |
@@ -162,16 +162,16 @@ ZOHO_REFRESH_TOKEN=YOUR_ZOHO_REFRESH_TOKEN
 
 ---
 
-## 🔮 Future Development Roadmap
+## Future Development Roadmap
 
-* ☁️ **Zoho Catalyst Cloud Expansion:** Migrate microservices to **Zoho Catalyst Serverless Functions** and **DataStore** for auto-scaling enterprise operations.
-* 👤 **Biometric Recognition:** Integrate facial recognition and fingerprint scanning directly into the field interface for instant suspect identification.
-* ⚖️ **Continuous Model Fine-Tuning:** Extend LLM training to maximize NL2SQL precision while actively auditing and eliminating algorithmic bias.
-* 🔗 **State System Interoperability:** Establish secure API bridges with CCTNS, Vahan, and central registries for seamless cross-agency intelligence sharing.
+* **Zoho Catalyst Cloud Expansion:** Migrate microservices to **Zoho Catalyst Serverless Functions** and **DataStore** for auto-scaling enterprise operations.
+* **Biometric Recognition:** Integrate facial recognition and fingerprint scanning directly into the field interface for instant suspect identification.
+* **Continuous Model Fine-Tuning:** Extend LLM training to maximize NL2SQL precision while actively auditing and eliminating algorithmic bias.
+* **State System Interoperability:** Establish secure API bridges with CCTNS, Vahan, and central registries for seamless cross-agency intelligence sharing.
 
 ---
 
-## 👥 Team & Credits
+## Team & Credits
 
 Developed by **Team MAJK** for the **Karnataka State Police Datathon 2026**.
 

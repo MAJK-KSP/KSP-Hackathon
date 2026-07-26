@@ -52,7 +52,8 @@ export const getPythonUrl = (endpoint: string): string => {
 };
 
 const app = express();
-const PORT = process.env.X_ZOHO_CATALYST_LISTEN_PORT || process.env.PORT || 3000;
+app.set('trust proxy', 1);
+const PORT = process.env.X_ZOHO_CATALYST_LISTEN_PORT || process.env.PORT || process.env.LISTEN_PORT || 3000;
 
 // Middleware Setup
 app.use(compression());
@@ -463,35 +464,35 @@ app.get(
   attachUserRole,
   requireRoles(['analysts', 'investigators', 'supervisors']),
   async (req: RoleAwareRequest, res) => {
-  try {
-    const pythonBackendUrl = getPythonUrl('/api/network/analyze');
-    const response = await fetch(pythonBackendUrl);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorJson;
-      try {
-        errorJson = JSON.parse(errorText);
-      } catch {
-        errorJson = null;
+    try {
+      const pythonBackendUrl = getPythonUrl('/api/network/analyze');
+      const response = await fetch(pythonBackendUrl);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorJson;
+        try {
+          errorJson = JSON.parse(errorText);
+        } catch {
+          errorJson = null;
+        }
+        return res.status(response.status).json({
+          error: errorJson?.detail || errorJson?.error || errorText || 'Failed to fetch network analysis from backend'
+        });
       }
-      return res.status(response.status).json({ 
-        error: errorJson?.detail || errorJson?.error || errorText || 'Failed to fetch network analysis from backend' 
-      });
+
+      const data = await response.json();
+      return res.status(200).json(data);
+    } catch (error: any) {
+      console.error('Error fetching network analysis:', error);
+      if (error.code === 'ECONNREFUSED' || error.message?.includes('fetch failed')) {
+        return res.status(503).json({
+          error: 'Intelligence backend service is offline.'
+        });
+      }
+      return res.status(500).json({ error: 'Internal server error fetching network analysis' });
     }
-    
-    const data = await response.json();
-    return res.status(200).json(data);
-  } catch (error: any) {
-    console.error('Error fetching network analysis:', error);
-    if (error.code === 'ECONNREFUSED' || error.message?.includes('fetch failed')) {
-      return res.status(503).json({
-        error: 'Intelligence backend service is offline.'
-      });
-    }
-    return res.status(500).json({ error: 'Internal server error fetching network analysis' });
-  }
-});
+  });
 
 // 10. System Status Diagnostics
 app.get('/api/system/status', authenticateSession, async (req: AuthenticatedRequest, res) => {
@@ -899,8 +900,8 @@ initDb().then(async () => {
   console.error('Failed to initialize database:', err);
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running securely on http://localhost:${PORT}`);
+app.listen(Number(PORT), '0.0.0.0', () => {
+  console.log(`Server running securely on port ${PORT}`);
 });
 
 export default app;

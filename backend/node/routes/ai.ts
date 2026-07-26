@@ -138,7 +138,7 @@ aiRouter.post('/chat', async (req: RoleAwareRequest, res: Response) => {
                 reasoningSteps = data.reasoning_steps || [];
                 timeTakenMs = data.time_taken_ms || 0;
               } else if (data.type === 'error') {
-                finalResponse = `⚠️ **Error**: ${data.error}`;
+                finalResponse = `**Error**: ${data.error}`;
                 reasoningSteps = ['Error generating response.'];
               }
             } catch (jsonErr) {
@@ -148,13 +148,13 @@ aiRouter.post('/chat', async (req: RoleAwareRequest, res: Response) => {
         }
       } else {
         const errText = await response.text();
-        finalResponse = `⚠️ **Error**: Failed to generate response from intelligence backend: ${errText}`;
+        finalResponse = `**Error**: Failed to generate response from intelligence backend: ${errText}`;
         reasoningSteps = ['Failed to retrieve operational response.'];
         res.write(JSON.stringify({ type: 'error', error: finalResponse }) + '\n');
       }
     } catch (err: any) {
       console.error('Error fetching from AI backend:', err);
-      finalResponse = `⚠️ **Error**: Intelligence service is offline. Please verify the FastAPI server is running.`;
+      finalResponse = `**Error**: Intelligence service is offline. Please verify the FastAPI server is running.`;
       reasoningSteps = ['Backend service offline.'];
       res.write(JSON.stringify({ type: 'error', error: finalResponse }) + '\n');
     }

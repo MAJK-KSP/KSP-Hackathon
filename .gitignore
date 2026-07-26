@@ -20,3 +20,5 @@ backend/python/.env
 .DS_Store
 Thumbs.db
 backend/node/storage/pdf_exports/
+*.zip
+catalyst-debug.log

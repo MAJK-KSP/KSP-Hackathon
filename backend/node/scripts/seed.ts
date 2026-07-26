@@ -62,7 +62,7 @@ async function seed() {
     );
 
     console.log('\n=============================================');
-    console.log('🎉 SUCCESS: Admin Account Created Successfully!');
+    console.log('SUCCESS: Admin Account Created Successfully!');
     console.log('=============================================');
     console.log(`Email:      ${email}`);
     console.log(`User ID:    ${userId}`);

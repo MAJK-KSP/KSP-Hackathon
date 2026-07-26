@@ -1,0 +1,9 @@
+{
+  "command": "sh start.sh",
+  "stack": "docker",
+  "build_path": ".",
+  "env_variables": {
+    "NODE_ENV": "production",
+    "PYTHON_BACKEND_URL": "http://127.0.0.1:8000"
+  }
+}

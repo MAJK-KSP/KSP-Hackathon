@@ -1,0 +1,9 @@
+{
+  "appsail": [
+    {
+      "name": "ksp-command-terminal",
+      "source": ".",
+      "build_path": "."
+    }
+  ]
+}

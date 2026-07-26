@@ -1,6 +1,5 @@
 """
-Zoho Catalyst QuickML Zia Text Translation API Integration.
-Endpoint: https://api.catalyst.zoho.in/quickml/api/v1/models/zia/translate
+Zoho Catalyst QuickML & Zia Multilingual Text Translation API Integration.
 Supported Languages: English, Hindi, Kannada, Tamil, Telugu, Malayalam, Marathi, Bengali, Gujarati, Punjabi, Odia.
 """
 
@@ -45,7 +44,7 @@ class TranslationRequest(BaseModel):
 @router.post("")
 async def translate_text(req: TranslationRequest):
     """
-    Translates text using Zoho Catalyst QuickML Zia Translate, then LLM fallback.
+    Translates text using Zoho Catalyst QuickML LLM Translation with bidirectional language support.
     """
     if not req.text or not req.text.strip():
         return {"translated_text": "", "target_language": req.target_language}
@@ -53,70 +52,47 @@ async def translate_text(req: TranslationRequest):
     target_lang = LANGUAGE_MAP.get(req.target_language.lower(), req.target_language.lower())
     lang_name = LANGUAGE_NAMES.get(target_lang, target_lang)
 
-    # Truncate to avoid token limits
     text = req.text.strip()[:1500]
 
     token = await get_zoho_token()
-    catalyst_org = getattr(settings, "catalyst_org", "80076334355") or "80076334355"
+    catalyst_org = settings.catalyst_org or "60076334355"
 
-    # ─── Attempt 1: Zoho Zia Translate API ───
-    zia_url = "https://api.catalyst.zoho.in/quickml/api/v1/models/zia/translate"
     headers = {
         "Content-Type": "application/json",
         "CATALYST-ORG": catalyst_org,
         "Authorization": f"Zoho-oauthtoken {token}",
     }
 
-    # Try the most likely payload format first
-    payload = {"text": text, "target_language": target_lang}
-    try:
-        async with httpx.AsyncClient(verify=False, timeout=5.0) as client:
-            resp = await client.post(zia_url, headers=headers, json=payload)
-            logger.info(f"[Translate] Zia API status={resp.status_code}, body={resp.text[:300]}")
+    quickml_url = settings.quickml_endpoint_url
 
-            if resp.status_code == 200:
-                data = resp.json()
-                translated = (
-                    data.get("translated_text")
-                    or data.get("result")
-                    or data.get("translation")
-                    or data.get("output")
-                    or (isinstance(data.get("data"), dict) and data["data"].get("translated_text"))
-                )
-                if translated and translated.strip() != text:
-                    logger.info(f"[Translate] Zia Translate succeeded -> {target_lang}")
-                    return {
-                        "translated_text": translated,
-                        "target_language": target_lang,
-                        "provider": "zoho_zia_translate",
-                    }
-                else:
-                    logger.warning(f"[Translate] Zia returned same text or empty. Falling back.")
-            else:
-                logger.warning(f"[Translate] Zia HTTP {resp.status_code}: {resp.text[:200]}")
-    except Exception as e:
-        logger.warning(f"[Translate] Zia Translate API error: {e}")
-
-    # ─── Attempt 2: Zoho QuickML LLM translation ───
-    try:
-        quickml_url = settings.quickml_endpoint_url
+    if target_lang == "en":
         prompt = (
-            f"Translate the following English text into {lang_name} ({target_lang}). "
-            f"Output ONLY the translated text. No explanations, no English, no commentary.\n\n"
+            f"Translate the following Kannada / Indic text accurately into clear, natural English.\n"
+            f"Output ONLY the translated English text. Do NOT output Kannada script or commentary.\n\n"
             f"{text}"
         )
-        llm_payload = {
-            "prompt": prompt,
-            "model": "VL-Qwen3.6-35B-A3B",
-            "images": ["iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="],
-            "system_prompt": f"You are a professional translator. Translate text accurately into {lang_name}. Output only the translation.",
-            "temperature": 0.3,
-            "max_tokens": 1024,
-        }
+        sys_prompt = "You are an expert official police translator. Translate Kannada and Indic texts into clear English. Output only the translation."
+    else:
+        prompt = (
+            f"Translate the following text accurately into {lang_name} ({target_lang}).\n"
+            f"Output ONLY the translated text in {lang_name}. No explanations, no commentary.\n\n"
+            f"{text}"
+        )
+        sys_prompt = f"You are a professional translator. Translate text accurately into {lang_name}. Output only the translation."
 
+    llm_payload = {
+        "prompt": prompt,
+        "model": "VL-Qwen3.6-35B-A3B",
+        "images": ["iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="],
+        "system_prompt": sys_prompt,
+        "temperature": 0.3,
+        "max_tokens": 1024,
+    }
+
+    try:
         async with httpx.AsyncClient(verify=False, timeout=20.0) as client:
             resp = await client.post(quickml_url, headers=headers, json=llm_payload)
-            logger.info(f"[Translate] QuickML LLM status={resp.status_code}, body={resp.text[:300]}")
+            logger.info(f"[Translate] QuickML LLM status={resp.status_code}")
 
             if resp.status_code == 200:
                 data = resp.json()
@@ -129,24 +105,21 @@ async def translate_text(req: TranslationRequest):
                 )
                 if isinstance(generated, str):
                     generated = generated.strip()
-                    # Remove markdown/commentary wrapping if present
                     for prefix in ["```", "Translation:", "Translated text:", f"{lang_name}:"]:
                         if generated.lower().startswith(prefix.lower()):
                             generated = generated[len(prefix):].strip()
                     generated = generated.rstrip("`").strip()
 
-                    if generated and generated != text:
-                        logger.info(f"[Translate] QuickML LLM translation succeeded -> {target_lang}")
+                    if generated:
+                        logger.info(f"[Translate] Translation succeeded -> {target_lang}")
                         return {
                             "translated_text": generated,
                             "target_language": target_lang,
                             "provider": "zoho_quickml_llm",
                         }
     except Exception as e:
-        logger.error(f"[Translate] QuickML LLM fallback error: {e}")
+        logger.error(f"[Translate] QuickML translation error: {e}")
 
-    # ─── Fallback: return original text ───
-    logger.error(f"[Translate] All translation attempts failed for target={target_lang}")
     return {
         "translated_text": text,
         "target_language": target_lang,

@@ -23,8 +23,8 @@ async def get_zoho_token() -> str:
     """Dynamically fetch a fresh Zoho access token if refresh credentials are provided, or fallback to static token."""
     global _cached_token, _token_expiry
     
-    # If cached token is still valid (with 5 minutes buffer), reuse it
-    if _cached_token and time.time() < _token_expiry - 300:
+    # If cached token is still valid (with 60 seconds buffer), reuse it
+    if _cached_token and time.time() < _token_expiry - 60:
         return _cached_token
 
     if settings.zoho_refresh_token and settings.zoho_client_id and settings.zoho_client_secret:
@@ -49,11 +49,17 @@ async def get_zoho_token() -> str:
                         _cached_token = token
                         _token_expiry = time.time() + expires_in
                         return token
-                logger.error(f"Failed to refresh Zoho token: {resp.status_code} - {resp.text}")
+                else:
+                    logger.error(f"Failed to refresh Zoho token: {resp.status_code} - {resp.text}")
+                    if _cached_token:
+                        logger.warning("Reusing cached Zoho token due to refresh endpoint rate-limit.")
+                        return _cached_token
         except Exception as e:
             logger.error(f"Error fetching Zoho access token: {e}")
+            if _cached_token:
+                return _cached_token
             
-    return settings.zoho_access_token
+    return _cached_token or settings.zoho_access_token
 
 
 
@@ -158,7 +164,7 @@ class ZohoQuickMLTransport(httpx.AsyncHTTPTransport):
                 else:
                     prompt = "\n".join(prompt_parts)
 
-                prompt += "\n\n[INSTRUCTION: If the user is just saying hello, asking for help, or having a general conversation, reply conversationally without a query. If you need to look up data to answer the user's question, generate an efficient SQL SELECT query inside <execute_select_query>SELECT ...</execute_select_query> tags. Query CaseMaster (joined with Unit, CrimeHead, Accused, Victim, etc. as needed). If searching for a station or FIR, use exact filtering in WHERE clauses on Unit.UnitName, and CaseMaster.CaseNo or CaseMaster.CrimeNo. Only SELECT the columns required to answer the question. ALWAYS use LIMIT 5 to avoid maximum length errors.]"
+                prompt += "\n\n[INSTRUCTION: If the user is just saying hello, asking for help, or having a general conversation, reply conversationally without a query. If you need to look up data to answer the user's question, generate an efficient SQL SELECT query inside <execute_select_query>SELECT ...</execute_select_query> tags. Query CaseMaster cm JOIN Unit u ON cm.PoliceStationID = u.UnitID WHERE u.UnitName ILIKE '%station_name%'. DO NOT use non-existent column names like station_id or police_station_id on CaseMaster. You can also query active_cases or investigation_cases views. Only SELECT the required columns. ALWAYS use LIMIT 5 to avoid maximum length errors.]"
                 
             quickml_data = {
                 "prompt": prompt,

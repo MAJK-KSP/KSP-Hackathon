@@ -39,7 +39,15 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         body: JSON.stringify({ email, password })
       });
       
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = {};
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = { error: text };
+        }
+      }
       
       if (!res.ok) {
         throw new Error(data.error || 'Login failed');
@@ -70,7 +78,15 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         body: JSON.stringify({ code: mfaCode, mfa_token: mfaToken, is_setup: false })
       });
       
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = {};
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = { error: text };
+        }
+      }
       
       if (!res.ok) {
         throw new Error(data.error || 'MFA verification failed');

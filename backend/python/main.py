@@ -4,6 +4,9 @@ Karnataka Police Intelligence Platform — FastAPI Application Entry Point.
 Sprint 1: AI Daily Operational Brief Generator.
 """
 
+import os
+import sys
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -317,3 +320,10 @@ async def chat_with_db(request: ChatRequest):
             }) + "\n"
 
     return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("X_ZOHO_CATALYST_LISTEN_PORT") or os.getenv("PORT") or os.getenv("LISTEN_PORT") or os.getenv("APP_PORT") or 8000)
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+

@@ -29,16 +29,16 @@ import { DbAutocompleteInput } from './DbAutocompleteInput';
 
 // Entity Color Palette & Configuration (Clean White & Navy Theme)
 const ENTITY_CONFIG: Record<string, { bg: string; border: string; text: string; labelColor: string; icon: string }> = {
-  ACCUSED: { bg: '#fef2f2', border: '#ef4444', text: '#991b1b', labelColor: '#7f1d1d', icon: '🔴' },
-  SUSPECT: { bg: '#fef2f2', border: '#f87171', text: '#991b1b', labelColor: '#7f1d1d', icon: '🔴' },
-  VICTIM: { bg: '#eff6ff', border: '#3b82f6', text: '#1e40af', labelColor: '#1e3a8a', icon: '🔵' },
-  WITNESS: { bg: '#faf5ff', border: '#a855f7', text: '#6b21a8', labelColor: '#581c87', icon: '👤' },
-  LOCATION: { bg: '#ecfdf5', border: '#10b981', text: '#065f46', labelColor: '#064e3b', icon: '🟢' },
-  FINANCIAL_ACCOUNT: { bg: '#faf5ff', border: '#a855f7', text: '#6b21a8', labelColor: '#581c87', icon: '🟣' },
-  VEHICLE: { bg: '#f0f9ff', border: '#38bdf8', text: '#075985', labelColor: '#0c4a6e', icon: '🚗' },
-  WEAPON: { bg: '#fff7ed', border: '#f97316', text: '#9a3412', labelColor: '#7c2d12', icon: '🗡️' },
-  EVIDENCE: { bg: '#fff7ed', border: '#f97316', text: '#9a3412', labelColor: '#7c2d12', icon: '📦' },
-  INCIDENT: { bg: '#fffbeb', border: '#f59e0b', text: '#92400e', labelColor: '#78350f', icon: '🟡' },
+  ACCUSED: { bg: '#fef2f2', border: '#ef4444', text: '#991b1b', labelColor: '#7f1d1d', icon: '' },
+  SUSPECT: { bg: '#fef2f2', border: '#f87171', text: '#991b1b', labelColor: '#7f1d1d', icon: '' },
+  VICTIM: { bg: '#eff6ff', border: '#3b82f6', text: '#1e40af', labelColor: '#1e3a8a', icon: '' },
+  WITNESS: { bg: '#faf5ff', border: '#a855f7', text: '#6b21a8', labelColor: '#581c87', icon: '' },
+  LOCATION: { bg: '#ecfdf5', border: '#10b981', text: '#065f46', labelColor: '#064e3b', icon: '' },
+  FINANCIAL_ACCOUNT: { bg: '#faf5ff', border: '#a855f7', text: '#6b21a8', labelColor: '#581c87', icon: '' },
+  VEHICLE: { bg: '#f0f9ff', border: '#38bdf8', text: '#075985', labelColor: '#0c4a6e', icon: '' },
+  WEAPON: { bg: '#fff7ed', border: '#f97316', text: '#9a3412', labelColor: '#7c2d12', icon: '' },
+  EVIDENCE: { bg: '#fff7ed', border: '#f97316', text: '#9a3412', labelColor: '#7c2d12', icon: '' },
+  INCIDENT: { bg: '#fffbeb', border: '#f59e0b', text: '#92400e', labelColor: '#78350f', icon: '' },
 };
 
 // Custom ReactFlow Entity Node Card
@@ -499,7 +499,7 @@ const NetworkGraphContent: React.FC = () => {
                   transition: 'all 0.15s ease'
                 }}
               >
-                📂 Mode 1: Case Deep Dive
+                Mode 1: Case Deep Dive
               </button>
               <button
                 onClick={() => setNetworkMode('gang')}
@@ -515,7 +515,7 @@ const NetworkGraphContent: React.FC = () => {
                   transition: 'all 0.15s ease'
                 }}
               >
-                🕸️ Mode 2: Organized Crime Network
+                Mode 2: Organized Crime Network
               </button>
             </div>
 

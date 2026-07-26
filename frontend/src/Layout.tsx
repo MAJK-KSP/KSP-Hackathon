@@ -256,7 +256,6 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
                   alignItems: 'center',
                   gap: '6px'
                 }}>
-                  <span>🛡️</span>
                   <span>{(user.role || 'officer').toUpperCase()}</span>
                 </span>
               )}
@@ -294,7 +293,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
                   <line x1="2" y1="12" x2="22" y2="12"></line>
                   <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
                 </svg>
-                <span id="lang-text">{locale === 'kn' ? '🌐 English' : '🌐 ಕನ್ನಡ (Kannada)'}</span>
+                <span id="lang-text">{locale === 'kn' ? 'English' : 'ಕನ್ನಡ (Kannada)'}</span>
               </button>
             </div>
           </div>

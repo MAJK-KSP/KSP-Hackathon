@@ -109,12 +109,24 @@ DIRECTIVES:
    - CaseMaster.CrimeMajorHeadID = CrimeHead.CrimeHeadID
    - CaseMaster.CrimeMinorHeadID = CrimeSubHead.CrimeSubHeadID
    - ArrestSurrender.AccusedMasterID = Accused.AccusedMasterID
-5. FULL DATABASE ACCESS (51 TABLES):
+   [CRITICAL COLUMN & TABLE MISNOMER MAPPINGS - DO NOT HALLUCINATE]:
+    - NO 'policestationmaster' or 'police_station_master' -> USE 'Unit' table (UnitID, UnitName) or view 'active_cases' (station_name) or 'investigation_cases' (police_station).
+    - NO 'CaseNumber' -> USE 'CaseNo' or 'CrimeNo' on 'CaseMaster'.
+    - NO 'station_id' or 'police_station_id' on CaseMaster -> JOIN CaseMaster cm WITH Unit u ON cm.PoliceStationID = u.UnitID WHERE u.UnitName ILIKE '%station_name%'.
+    - NO 'officer_name' on CaseMaster -> JOIN CaseMaster cm WITH Employee e ON cm.PolicePersonID = e.EmployeeID.
+    - NO 'accused_name' on CaseMaster -> JOIN CaseMaster cm WITH Accused a ON cm.CaseMasterID = a.CaseMasterID.
+    - NO 'firno', 'fir_no', 'fir_num' on CaseMaster -> USE 'CrimeNo' or 'CaseNo' on CaseMaster, or 'fir_number' on view 'active_cases'.
+    [CRITICAL JOIN EXAMPLES]:
+    - Station query example: SELECT cm.CaseNo, cm.BriefFacts, u.UnitName FROM CaseMaster cm JOIN Unit u ON cm.PoliceStationID = u.UnitID WHERE u.UnitName ILIKE '%mysuru%' LIMIT 5;
+    - Simplified view example: SELECT * FROM active_cases WHERE station_name ILIKE '%mysuru%' LIMIT 5;
+ 5. FULL DATABASE ACCESS (51 TABLES):
    - You have access to the following tables: accused, act, active_cases, actsectionassociation, ai_dataset_registry, arrestsurrender, casecategory, casemaster, cases, casestatusmaster, castemaster, chargesheetdetails, chat_conversations, chat_messages, complainantdetails, court, crimehead, crimeheadactsection, crimesubhead, daily_briefings, daily_operational_data, designation, district, employee, geography_columns, geometry_columns, gravityoffence, inv_arrestsurrenderaccused, inv_occurancetime, investigation_cases, investigation_evidence, investigation_interviews, investigation_locations, investigation_logs, investigation_suspects, occupationmaster, officer_profiles, overnight_incidents, rank, religionmaster, repeat_offenders, section, sessions, spatial_ref_sys, state, unit, unittype, user_roles, users, victim
 6. CONVERSATIONAL SUMMARIES INSTEAD OF FORMAL REPORTS:
    - Always respond as a friendly, helpful conversational assistant chatting directly with an officer.
    - Provide clear, concise natural language summaries in 2-4 sentences or quick bullet points. DO NOT output rigid formal document headers (like 'Police Intelligence Dossier', 'Official Status Report', 'Status Report').
-   - Keep answers easy to read, conversational, and available in English, Kannada (ಕನ್ನಡ), or Hindi (हिंदी)."""
+   - Keep answers easy to read, conversational, and available in English, Kannada (ಕನ್ನಡ), or Hindi (हिंदी).
+7. NO EMOJIS:
+   - Do NOT use any emojis anywhere in your response."""
 
 db_agent = Agent(
     model,
@@ -185,6 +197,28 @@ def execute_select_query(sql: str = "", **kwargs) -> str:
                 log_reasoning_step(f"Retrieved {len(rows)} records from database.")
                 return json.dumps(rows, default=str, indent=2)
     except Exception as e:
-        logger.error(f"SQL execution error: {e}")
-        log_reasoning_step(f"Query error: {str(e)}")
-        return f"Database Error: {str(e)}"
+        err_msg = str(e)
+        logger.error(f"SQL execution error: {err_msg}")
+        
+        # Self-healing Schema Helper: Introspect valid columns or missing tables
+        col_match = re.search(r'column ["\']?(.*?)["\']? does not exist', err_msg, re.IGNORECASE)
+        table_match = re.search(r'\bfrom\s+([a-zA-Z0-9_]+)', query, re.IGNORECASE)
+        
+        if table_match:
+            table_name = table_match.group(1).lower()
+            try:
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "SELECT column_name FROM information_schema.columns WHERE LOWER(table_name) = %s ORDER BY ordinal_position;",
+                            (table_name,)
+                        )
+                        cols = [r["column_name"] for r in cur.fetchall()]
+                        if cols:
+                            return f"Database Error: {err_msg}. Valid columns for table '{table_name}' are: {', '.join(cols)}. Please rewrite the query using valid column names from this list."
+                        else:
+                            return f"Database Error: Table '{table_name}' does not exist in the database! For police stations, use table 'Unit' (UnitID, UnitName) or view 'active_cases' (station_name). For cases, use 'CaseMaster' (CaseNo, CrimeNo, BriefFacts, PoliceStationID). Please rewrite the query using existing tables."
+            except Exception:
+                pass
+
+        return f"Database Error: {err_msg}. Please rewrite your query using valid table and column names (e.g. CaseMaster, Unit, Accused, active_cases)."
