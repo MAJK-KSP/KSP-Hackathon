@@ -11,7 +11,6 @@ import { Layout } from './Layout';
 import { Login } from './components/Login';
 import { Dashboard } from './components/Dashboard';
 import { Settings } from './components/Settings';
-import { Profile } from './components/Profile';
 import { AiChat } from './components/AiChat';
 import { UserManagement } from './components/UserManagement';
 import { GisMap } from './components/GisMap';
